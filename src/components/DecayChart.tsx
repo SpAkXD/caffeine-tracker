@@ -15,28 +15,80 @@ const ALERTNESS_COLOR = '#FF9500';
 const WARNING_COLOR = '#FF3B30'; // Red for caffeine during sleep zone
 
 /**
- * Creates smooth Bezier curve path from points
- * Uses Catmull-Rom to Bezier conversion for natural curves
+ * Creates a smooth Bezier curve path from points using monotone cubic
+ * Hermite interpolation (Fritsch-Carlson). This prevents overshoot and
+ * undershoot, so the curve never dips below zero before a spike.
+ *
+ * @param points  Array of {x, y} pixel coordinates.
+ * @param yMax    Maximum Y pixel value (bottom of chart area). Control
+ *                points are clamped so the curve never exceeds this.
  */
-const createSmoothPath = (points: { x: number; y: number }[]): string => {
+const createSmoothPath = (
+    points: { x: number; y: number }[],
+    yMax?: number,
+): string => {
     if (points.length === 0) return '';
     if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
     if (points.length === 2) return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
 
-    let path = `M ${points[0].x} ${points[0].y}`;
+    const n = points.length;
 
-    for (let i = 0; i < points.length - 1; i++) {
-        const p0 = i > 0 ? points[i - 1] : points[i];
-        const p1 = points[i];
-        const p2 = points[i + 1];
-        const p3 = i < points.length - 2 ? points[i + 2] : p2;
+    // 1. Compute slopes (deltas) between successive points
+    const dx: number[] = [];
+    const dy: number[] = [];
+    const m: number[] = []; // tangents
 
-        const cp1x = p1.x + (p2.x - p0.x) / 6;
-        const cp1y = p1.y + (p2.y - p0.y) / 6;
-        const cp2x = p2.x - (p3.x - p1.x) / 6;
-        const cp2y = p2.y - (p3.y - p1.y) / 6;
+    for (let i = 0; i < n - 1; i++) {
+        dx.push(points[i + 1].x - points[i].x);
+        dy.push(points[i + 1].y - points[i].y);
+    }
 
-        path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    const slopes: number[] = dx.map((d, i) => (d === 0 ? 0 : dy[i] / d));
+
+    // 2. Compute initial tangents using averages of successive slopes
+    m.push(slopes[0]);
+    for (let i = 1; i < n - 1; i++) {
+        if (slopes[i - 1] * slopes[i] <= 0) {
+            // Sign change or zero — flat tangent prevents overshoot
+            m.push(0);
+        } else {
+            m.push((slopes[i - 1] + slopes[i]) / 2);
+        }
+    }
+    m.push(slopes[slopes.length - 1]);
+
+    // 3. Fritsch-Carlson monotonicity correction
+    for (let i = 0; i < n - 1; i++) {
+        if (slopes[i] === 0) {
+            m[i] = 0;
+            m[i + 1] = 0;
+        } else {
+            const alpha = m[i] / slopes[i];
+            const beta = m[i + 1] / slopes[i];
+            // Restrict to a circle of radius 3 to guarantee monotonicity
+            const mag = Math.sqrt(alpha * alpha + beta * beta);
+            if (mag > 3) {
+                const tau = 3 / mag;
+                m[i] = tau * alpha * slopes[i];
+                m[i + 1] = tau * beta * slopes[i];
+            }
+        }
+    }
+
+    // 4. Build SVG cubic Bézier path with optional Y clamping
+    const clampY = (val: number) =>
+        yMax !== undefined ? Math.min(val, yMax) : val;
+
+    let path = `M ${points[0].x} ${clampY(points[0].y)}`;
+
+    for (let i = 0; i < n - 1; i++) {
+        const segDx = dx[i];
+        const cp1x = points[i].x + segDx / 3;
+        const cp1y = clampY(points[i].y + (m[i] * segDx) / 3);
+        const cp2x = points[i + 1].x - segDx / 3;
+        const cp2y = clampY(points[i + 1].y - (m[i + 1] * segDx) / 3);
+
+        path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${points[i + 1].x} ${clampY(points[i + 1].y)}`;
     }
 
     return path;
@@ -173,13 +225,14 @@ export const DecayChart: React.FC<DecayChartProps> = ({
             }
         }
 
-        const normalCaffeinePath = normalSegments.map(seg => createSmoothPath(seg)).join(' ');
-        const warningCaffeinePath = warningSegments.map(seg => createSmoothPath(seg)).join(' ');
+        const chartBottom = PADDING.top + innerHeight;
+        const normalCaffeinePath = normalSegments.map(seg => createSmoothPath(seg, chartBottom)).join(' ');
+        const warningCaffeinePath = warningSegments.map(seg => createSmoothPath(seg, chartBottom)).join(' ');
 
         // Build area fill path
         const areaPoints = caffeinePathPoints.map(p => ({ x: p.x, y: p.y }));
-        let caffeineArea = createSmoothPath(areaPoints);
-        caffeineArea += ` L ${areaPoints[areaPoints.length - 1].x} ${PADDING.top + innerHeight} L ${areaPoints[0].x} ${PADDING.top + innerHeight} Z`;
+        let caffeineArea = createSmoothPath(areaPoints, chartBottom);
+        caffeineArea += ` L ${areaPoints[areaPoints.length - 1].x} ${chartBottom} L ${areaPoints[0].x} ${chartBottom} Z`;
 
         // Build alertness path with sleep zone clamping
         const alertnessPathPoints = alertnessPoints.map((p, i) => {
@@ -190,7 +243,7 @@ export const DecayChart: React.FC<DecayChartProps> = ({
                 y: getAlertnessY(clampedValue),
             };
         });
-        const alertnessPath = createSmoothPath(alertnessPathPoints);
+        const alertnessPath = createSmoothPath(alertnessPathPoints, chartBottom);
 
         // X-axis labels: every 3 hours + "Now" marker
         const labels: { x: number; label: string; isNow?: boolean }[] = [];

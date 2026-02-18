@@ -313,7 +313,7 @@ export default function SettingsScreen() {
                     />
                 )}
 
-                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.1.1</Text>
+                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.1.2</Text>
 
                 {/* Widget Preview */}
                 {FEATURES.WIDGET_PREVIEW && (
