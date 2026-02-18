@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView, Switch, Linking, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { StyledButton } from '../src/components/StyledButton';
@@ -16,6 +17,7 @@ import {
 import { WidgetPreview } from '../src/components/WidgetPreview';
 
 import { FEATURES } from '../src/config/featureFlags';
+import { InfoPopupModal } from '../src/components/InfoPopupModal';
 
 export default function SettingsScreen() {
     const halfLifeHours = useCaffeineStore(state => state.halfLifeHours);
@@ -38,6 +40,24 @@ export default function SettingsScreen() {
     const [localHalfLife, setLocalHalfLife] = useState(halfLifeHours);
     const [localThreshold, setLocalThreshold] = useState(sleepThresholdMg);
     const [localWeight, setLocalWeight] = useState(weightKg);
+
+    // Info popup state
+    const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
+
+    const INFO_DESCRIPTIONS: Record<string, { title: string; description: string }> = {
+        weight: {
+            title: 'Weight',
+            description: 'Heavier people generally metabolize caffeine faster. Lowering your weight increases your effective half-life, meaning caffeine stays in your system longer.',
+        },
+        halfLife: {
+            title: 'Base Half-Life',
+            description: 'This is your genetic baseline. The average adult is 5 hours. If you know you are highly sensitive to caffeine and it keeps you up, increase this number.',
+        },
+        threshold: {
+            title: 'Sleep Threshold',
+            description: 'The maximum amount of active caffeine your body can handle before it disrupts your sleep. Lowering this number means you will need to stop drinking coffee earlier in the day to reach your target by bedtime.',
+        },
+    };
 
     const effectiveHalfLife = getEffectiveHalfLife();
 
@@ -108,183 +128,217 @@ export default function SettingsScreen() {
     };
 
     return (
-        <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
+        <View style={[styles.wrapper, { backgroundColor: colors.background }]}>
+            <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
-            {FEATURES.THEME_TOGGLE && (
-                <GlassmorphicCard style={styles.card}>
-                    <View style={styles.row}>
-                        <Text style={[styles.label, { color: colors.primary }]}>Appearance</Text>
-                        <View style={styles.switchRow}>
-                            <Text style={[styles.switchLabel, { color: colors.text }]}>{theme === 'dark' ? 'Dark' : 'Light'}</Text>
-                            <Switch
-                                value={theme === 'dark'}
-                                onValueChange={toggleTheme}
-                                trackColor={{ false: '#767577', true: colors.primary }}
-                                thumbColor="#f4f3f4"
-                            />
-                        </View>
-                    </View>
-                </GlassmorphicCard>
-            )}
-
-            {FEATURES.NOTIFICATIONS && (
-                <GlassmorphicCard style={styles.card}>
-                    <View style={styles.row}>
-                        <Text style={[styles.label, { color: colors.primary }]}>Notifications</Text>
-                        <View style={styles.switchRow}>
-                            <Text style={[styles.switchLabel, { color: colors.text }]}>{notificationsEnabled ? 'On' : 'Off'}</Text>
-                            <Switch
-                                value={notificationsEnabled}
-                                onValueChange={handleNotificationToggle}
-                                trackColor={{ false: '#767577', true: colors.primary }}
-                                thumbColor="#f4f3f4"
-                            />
-                        </View>
-                    </View>
-                    <Text style={[styles.description, { color: colors.textSecondary }]}>
-                        Get periodic updates showing your current caffeine level
-                    </Text>
-
-                    {notificationsEnabled && (
-                        <View style={styles.frequencyContainer}>
-                            <Text style={[styles.frequencyLabel, { color: colors.textSecondary }]}>
-                                Update Frequency
-                            </Text>
-                            <View style={styles.frequencyRow}>
-                                {([1, 3, 6] as const).map((freq) => (
-                                    <TouchableOpacity
-                                        key={freq}
-                                        style={[
-                                            styles.frequencyOption,
-                                            {
-                                                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-                                                borderColor: colors.border,
-                                            },
-                                            notificationFrequency === freq && {
-                                                backgroundColor: theme === 'dark' ? 'rgba(0, 240, 255, 0.2)' : 'rgba(0, 122, 255, 0.2)',
-                                                borderColor: colors.primary,
-                                            },
-                                        ]}
-                                        onPress={() => handleFrequencyChange(freq)}
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.frequencyText,
-                                                { color: colors.textSecondary },
-                                                notificationFrequency === freq && { color: colors.primary, fontWeight: '700' },
-                                            ]}
-                                        >
-                                            {freq}h
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
+                {FEATURES.THEME_TOGGLE && (
+                    <GlassmorphicCard style={styles.card}>
+                        <View style={styles.row}>
+                            <Text style={[styles.label, { color: colors.primary }]}>Appearance</Text>
+                            <View style={styles.switchRow}>
+                                <Text style={[styles.switchLabel, { color: colors.text }]}>{theme === 'dark' ? 'Dark' : 'Light'}</Text>
+                                <Switch
+                                    value={theme === 'dark'}
+                                    onValueChange={toggleTheme}
+                                    trackColor={{ false: '#767577', true: colors.primary }}
+                                    thumbColor="#f4f3f4"
+                                />
                             </View>
                         </View>
-                    )}
-                </GlassmorphicCard>
-            )}
+                    </GlassmorphicCard>
+                )}
 
-            {/* NEW: Body Weight Section */}
-            {FEATURES.WEIGHT_SETTING && (
-                <GlassmorphicCard style={styles.card}>
-                    <Text style={[styles.label, { color: colors.primary }]}>Your Weight</Text>
-                    <Text style={[styles.value, { color: colors.text }]}>{Math.round(localWeight)} kg</Text>
-                    <Text style={[styles.description, { color: colors.textSecondary }]}>
-                        Heavier people metabolize caffeine faster. This adjusts your personal half-life.
-                    </Text>
-
-                    <Slider
-                        style={styles.slider}
-                        minimumValue={40}
-                        maximumValue={150}
-                        step={1}
-                        value={localWeight}
-                        onValueChange={handleWeightChange}
-                        minimumTrackTintColor={colors.primary}
-                        maximumTrackTintColor="rgba(128,128,128,0.3)"
-                        thumbTintColor={colors.text}
-                    />
-
-                    <View style={styles.effectiveRow}>
-                        <Text style={[styles.effectiveLabel, { color: colors.textSecondary }]}>
-                            Your Effective Half-Life:
+                {FEATURES.NOTIFICATIONS && (
+                    <GlassmorphicCard style={styles.card}>
+                        <View style={styles.row}>
+                            <Text style={[styles.label, { color: colors.primary }]}>Notifications</Text>
+                            <View style={styles.switchRow}>
+                                <Text style={[styles.switchLabel, { color: colors.text }]}>{notificationsEnabled ? 'On' : 'Off'}</Text>
+                                <Switch
+                                    value={notificationsEnabled}
+                                    onValueChange={handleNotificationToggle}
+                                    trackColor={{ false: '#767577', true: colors.primary }}
+                                    thumbColor="#f4f3f4"
+                                />
+                            </View>
+                        </View>
+                        <Text style={[styles.description, { color: colors.textSecondary }]}>
+                            Get periodic updates showing your current caffeine level
                         </Text>
-                        <Text style={[styles.effectiveValue, { color: colors.accent }]}>
-                            {effectiveHalfLife.toFixed(1)} hrs
+
+                        {notificationsEnabled && (
+                            <View style={styles.frequencyContainer}>
+                                <Text style={[styles.frequencyLabel, { color: colors.textSecondary }]}>
+                                    Update Frequency
+                                </Text>
+                                <View style={styles.frequencyRow}>
+                                    {([1, 3, 6] as const).map((freq) => (
+                                        <TouchableOpacity
+                                            key={freq}
+                                            style={[
+                                                styles.frequencyOption,
+                                                {
+                                                    backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                                                    borderColor: colors.border,
+                                                },
+                                                notificationFrequency === freq && {
+                                                    backgroundColor: theme === 'dark' ? 'rgba(0, 240, 255, 0.2)' : 'rgba(0, 122, 255, 0.2)',
+                                                    borderColor: colors.primary,
+                                                },
+                                            ]}
+                                            onPress={() => handleFrequencyChange(freq)}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.frequencyText,
+                                                    { color: colors.textSecondary },
+                                                    notificationFrequency === freq && { color: colors.primary, fontWeight: '700' },
+                                                ]}
+                                            >
+                                                {freq}h
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
+                    </GlassmorphicCard>
+                )}
+
+                {/* NEW: Body Weight Section */}
+                {FEATURES.WEIGHT_SETTING && (
+                    <GlassmorphicCard style={styles.card}>
+                        <View style={styles.labelRow}>
+                            <Text style={[styles.label, { color: colors.primary }]}>Your Weight</Text>
+                            {FEATURES.INFO_POPUPS && (
+                                <TouchableOpacity onPress={() => setInfoPopup(INFO_DESCRIPTIONS.weight)}>
+                                    <Ionicons name="information-circle-outline" size={22} color={colors.primary} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        <Text style={[styles.value, { color: colors.text }]}>{Math.round(localWeight)} kg</Text>
+                        <Text style={[styles.description, { color: colors.textSecondary }]}>
+                            Heavier people metabolize caffeine faster. This adjusts your personal half-life.
                         </Text>
-                    </View>
-                </GlassmorphicCard>
-            )}
 
-            {FEATURES.HALF_LIFE_SETTING && (
-                <GlassmorphicCard style={styles.card}>
-                    <Text style={[styles.label, { color: colors.primary }]}>Base Half-Life (Hours)</Text>
-                    <Text style={[styles.value, { color: colors.text }]}>{localHalfLife.toFixed(1)} hrs</Text>
-                    <Text style={[styles.description, { color: colors.textSecondary }]}>
-                        The baseline time for half of caffeine to be eliminated.
-                        Average is 5 hours. Adjust if you're a fast/slow metabolizer.
-                    </Text>
+                        <Slider
+                            style={styles.slider}
+                            minimumValue={30}
+                            maximumValue={150}
+                            step={1}
+                            value={localWeight}
+                            onValueChange={handleWeightChange}
+                            minimumTrackTintColor={colors.primary}
+                            maximumTrackTintColor="rgba(128,128,128,0.3)"
+                            thumbTintColor={colors.text}
+                        />
 
-                    <Slider
-                        style={styles.slider}
-                        minimumValue={3}
-                        maximumValue={8}
-                        step={0.1}
-                        value={localHalfLife}
-                        onValueChange={handleHalfLifeChange}
-                        minimumTrackTintColor={colors.primary}
-                        maximumTrackTintColor="rgba(128,128,128,0.3)"
-                        thumbTintColor={colors.text}
+                        <View style={styles.effectiveRow}>
+                            <Text style={[styles.effectiveLabel, { color: colors.textSecondary }]}>
+                                Your Effective Half-Life:
+                            </Text>
+                            <Text style={[styles.effectiveValue, { color: colors.accent }]}>
+                                {effectiveHalfLife.toFixed(1)} hrs
+                            </Text>
+                        </View>
+                    </GlassmorphicCard>
+                )}
+
+                {FEATURES.HALF_LIFE_SETTING && (
+                    <GlassmorphicCard style={styles.card}>
+                        <View style={styles.labelRow}>
+                            <Text style={[styles.label, { color: colors.primary }]}>Base Half-Life (Hours)</Text>
+                            {FEATURES.INFO_POPUPS && (
+                                <TouchableOpacity onPress={() => setInfoPopup(INFO_DESCRIPTIONS.halfLife)}>
+                                    <Ionicons name="information-circle-outline" size={22} color={colors.primary} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        <Text style={[styles.value, { color: colors.text }]}>{localHalfLife.toFixed(1)} hrs</Text>
+                        <Text style={[styles.description, { color: colors.textSecondary }]}>
+                            The baseline time for half of caffeine to be eliminated.
+                            Average is 5 hours. Adjust if you're a fast/slow metabolizer.
+                        </Text>
+
+                        <Slider
+                            style={styles.slider}
+                            minimumValue={3}
+                            maximumValue={8}
+                            step={0.1}
+                            value={localHalfLife}
+                            onValueChange={handleHalfLifeChange}
+                            minimumTrackTintColor={colors.primary}
+                            maximumTrackTintColor="rgba(128,128,128,0.3)"
+                            thumbTintColor={colors.text}
+                        />
+                    </GlassmorphicCard>
+                )}
+
+                {FEATURES.THRESHOLD_SETTING && (
+                    <GlassmorphicCard style={styles.card}>
+                        <View style={styles.labelRow}>
+                            <Text style={[styles.label, { color: colors.primary }]}>Sleep Threshold (mg)</Text>
+                            {FEATURES.INFO_POPUPS && (
+                                <TouchableOpacity onPress={() => setInfoPopup(INFO_DESCRIPTIONS.threshold)}>
+                                    <Ionicons name="information-circle-outline" size={22} color={colors.primary} />
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                        <Text style={[styles.value, { color: colors.text }]}>{Math.round(localThreshold)} mg</Text>
+                        <Text style={[styles.description, { color: colors.textSecondary }]}>
+                            The caffeine level below which you can sleep comfortably.
+                            Default is 50mg. Lower = stricter.
+                        </Text>
+
+                        <Slider
+                            style={styles.slider}
+                            minimumValue={10}
+                            maximumValue={100}
+                            step={5}
+                            value={localThreshold}
+                            onValueChange={handleThresholdChange}
+                            minimumTrackTintColor={colors.accent}
+                            maximumTrackTintColor="rgba(128,128,128,0.3)"
+                            thumbTintColor={colors.text}
+                        />
+                    </GlassmorphicCard>
+                )}
+
+                {FEATURES.CLEAR_DATA && (
+                    <StyledButton
+                        title="Reset All Data"
+                        variant="danger"
+                        onPress={handleClearData}
+                        style={styles.resetButton}
                     />
-                </GlassmorphicCard>
-            )}
+                )}
 
-            {FEATURES.THRESHOLD_SETTING && (
-                <GlassmorphicCard style={styles.card}>
-                    <Text style={[styles.label, { color: colors.primary }]}>Sleep Threshold (mg)</Text>
-                    <Text style={[styles.value, { color: colors.text }]}>{Math.round(localThreshold)} mg</Text>
-                    <Text style={[styles.description, { color: colors.textSecondary }]}>
-                        The caffeine level below which you can sleep comfortably.
-                        Default is 50mg. Lower = stricter.
-                    </Text>
+                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.1.1</Text>
 
-                    <Slider
-                        style={styles.slider}
-                        minimumValue={10}
-                        maximumValue={100}
-                        step={5}
-                        value={localThreshold}
-                        onValueChange={handleThresholdChange}
-                        minimumTrackTintColor={colors.accent}
-                        maximumTrackTintColor="rgba(128,128,128,0.3)"
-                        thumbTintColor={colors.text}
-                    />
-                </GlassmorphicCard>
-            )}
+                {/* Widget Preview */}
+                {FEATURES.WIDGET_PREVIEW && (
+                    <GlassmorphicCard style={{ ...styles.card, marginTop: 20 }}>
+                        <WidgetPreview />
+                    </GlassmorphicCard>
+                )}
 
-            {FEATURES.CLEAR_DATA && (
-                <StyledButton
-                    title="Reset All Data"
-                    variant="danger"
-                    onPress={handleClearData}
-                    style={styles.resetButton}
-                />
-            )}
+            </ScrollView>
 
-            <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.2.0</Text>
-
-            {/* Widget Preview */}
-            {FEATURES.WIDGET_PREVIEW && (
-                <GlassmorphicCard style={{ ...styles.card, marginTop: 20 }}>
-                    <WidgetPreview />
-                </GlassmorphicCard>
-            )}
-
-        </ScrollView>
+            {/* Info Popup Modal */}
+            <InfoPopupModal
+                visible={infoPopup !== null}
+                title={infoPopup?.title ?? ''}
+                description={infoPopup?.description ?? ''}
+                onClose={() => setInfoPopup(null)}
+            />
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
+    wrapper: {
+        flex: 1,
+    },
     container: {
         flex: 1,
     },
@@ -310,6 +364,12 @@ const styles = StyleSheet.create({
     label: {
         fontSize: 16,
         fontWeight: 'bold',
+        marginBottom: 5,
+    },
+    labelRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         marginBottom: 5,
     },
     value: {

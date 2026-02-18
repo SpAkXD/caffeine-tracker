@@ -60,6 +60,9 @@ module.exports = {
         /** "Reset All Data" button */
         CLEAR_DATA: true,
 
+        /** Info popup icons next to settings metrics (Weight, Half-Life, Threshold) */
+        INFO_POPUPS: true,
+
         // ── Home Screen Widget ────────────────────────────────────────────
         /** Real Android home screen widget (GoodEnergy) */
         HOME_WIDGET: false,

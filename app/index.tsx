@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +21,7 @@ export default function Dashboard() {
     const router = useRouter();
     const theme = useCaffeineStore(state => state.theme);
     const colors = Colors[theme];
+    const insets = useSafeAreaInsets();
 
     // Chart visibility controls
     const [showCaffeine, setShowCaffeine] = useState(true);
@@ -91,7 +92,7 @@ export default function Dashboard() {
                 </ScrollView>
 
                 {FEATURES.ADD_DRINK && (
-                    <View style={styles.fabContainer}>
+                    <View style={[styles.fabContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
                         <StyledButton
                             title="+ Add Drink"
                             onPress={() => router.push('/add-drink')}
@@ -145,7 +146,7 @@ const styles = StyleSheet.create({
     },
     fabContainer: {
         position: 'absolute',
-        bottom: 30,
+        bottom: 0,
         left: 20,
         right: 20,
     },
