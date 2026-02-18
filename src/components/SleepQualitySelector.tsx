@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GlassmorphicCard } from './GlassmorphicCard';
+import { InfoPopupModal } from './InfoPopupModal';
 import { useCaffeineStore } from '../store/useCaffeineStore';
 import { Colors } from '../constants/Colors';
+import { FEATURES } from '../config/featureFlags';
 
 type QualityOption = 'poor' | 'average' | 'great';
 
@@ -60,13 +62,22 @@ export const SleepQualitySelector: React.FC = () => {
     const theme = useCaffeineStore(state => state.theme);
     const colors = Colors[theme];
 
+    const [showInfo, setShowInfo] = useState(false);
+
     return (
         <GlassmorphicCard style={styles.container} intensity={12}>
             <View style={styles.header}>
-                <Ionicons name="moon" size={16} color={colors.textSecondary} />
-                <Text style={[styles.title, { color: colors.text }]}>
-                    Last Night's Sleep
-                </Text>
+                <View style={styles.headerLeft}>
+                    <Ionicons name="moon" size={16} color={colors.textSecondary} />
+                    <Text style={[styles.title, { color: colors.text }]}>
+                        Last Night's Sleep
+                    </Text>
+                </View>
+                {FEATURES.INFO_POPUPS && (
+                    <TouchableOpacity onPress={() => setShowInfo(true)}>
+                        <Ionicons name="information-circle-outline" size={22} color={colors.primary} />
+                    </TouchableOpacity>
+                )}
             </View>
             <View style={styles.buttonRow}>
                 <QualityButton
@@ -99,6 +110,13 @@ export const SleepQualitySelector: React.FC = () => {
                 {sleepQuality === 'average' && 'Max alertness capped at 80%'}
                 {sleepQuality === 'great' && 'Full alertness potential (100%)'}
             </Text>
+
+            <InfoPopupModal
+                visible={showInfo}
+                title="Last Night's Sleep"
+                description="This sets your baseline energy for the day. 'Poor' sleep lowers your maximum possible alertness cap, meaning caffeine won't be as effective at making you feel fully rested. 'Average' is the standard baseline, and 'Great' sleep raises your natural energy ceiling."
+                onClose={() => setShowInfo(false)}
+            />
         </GlassmorphicCard>
     );
 };
@@ -110,8 +128,13 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
+        justifyContent: 'space-between',
         marginBottom: 12,
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
     },
     title: {
         fontSize: 14,
