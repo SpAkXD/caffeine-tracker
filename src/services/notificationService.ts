@@ -45,39 +45,50 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 /**
- * Schedule repeating notifications to show current caffeine level
- * @param getCurrentLevel - Function that returns current caffeine level in mg
+ * Schedule a one-shot notification for the exact moment caffeine drops
+ * to the user's sleep threshold. Cancels any previously scheduled
+ * threshold notifications first.
+ *
+ * This replaces the old "periodic background loop" approach — the OS
+ * can no longer kill a background task and cause missed alerts because
+ * the notification is pre-scheduled at a precise future timestamp.
+ *
+ * @param thresholdTimestamp  Unix-ms when the level will hit the threshold
+ * @param thresholdMg        The threshold value (for the notification body)
  */
-export async function schedulePeriodicNotifications(
-    getCurrentLevel: () => number
+export async function scheduleThresholdNotification(
+    thresholdTimestamp: number | null,
+    thresholdMg: number
 ): Promise<void> {
     try {
-        // Cancel any existing notifications first
+        // Always clear stale scheduled notifications first
         await cancelAllNotifications();
 
-        // Get initial caffeine level
-        const currentLevel = getCurrentLevel();
+        // Nothing to schedule if already below threshold or no clearance time
+        if (thresholdTimestamp === null) return;
 
-        // Schedule notification to repeat every hour
+        // Only schedule if the clearance time is in the future
+        const secondsUntil = Math.round((thresholdTimestamp - Date.now()) / 1000);
+        if (secondsUntil <= 0) return;
+
         await Notifications.scheduleNotificationAsync({
             content: {
-                title: '☕ Current Caffeine Level',
-                body: `${Math.round(currentLevel)} mg in your system`,
-                data: { type: 'caffeine-update' },
-                sound: false,
+                title: '🌙 Sleep-Safe!',
+                body: `Your caffeine is now below ${Math.round(thresholdMg)} mg — you're clear to sleep.`,
+                data: { type: 'threshold-reached' },
+                sound: true,
             },
             trigger: {
                 type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                seconds: 3600, // 1 hour in seconds
-                repeats: true,
+                seconds: secondsUntil,
+                repeats: false,
                 channelId: Platform.OS === 'android' ? 'caffeine-updates' : undefined,
             },
         });
 
-        console.log('Scheduled periodic caffeine notifications (hourly)');
+        console.log(`Threshold notification scheduled in ${(secondsUntil / 60).toFixed(0)} min`);
     } catch (error) {
-        console.error('Error scheduling notifications:', error);
-        throw error;
+        console.error('Error scheduling threshold notification:', error);
     }
 }
 

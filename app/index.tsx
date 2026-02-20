@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, AppState, AppStateStatus } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,7 @@ import { GlassmorphicCard } from '../src/components/GlassmorphicCard';
 import { HistoryCard } from '../src/components/HistoryCard';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { Colors } from '../src/constants/Colors';
+import { refreshWidget } from '../src/widget/refreshWidget';
 
 import { FEATURES } from '../src/config/featureFlags';
 
@@ -22,11 +23,32 @@ export default function Dashboard() {
     const theme = useCaffeineStore(state => state.theme);
     const colors = Colors[theme];
     const insets = useSafeAreaInsets();
+    const isProDebug = useCaffeineStore(state => state.isProDebug);
+    const lastRefreshed = useCaffeineStore(state => state.lastRefreshed);
+    const refreshCurrentLevel = useCaffeineStore(state => state.refreshCurrentLevel);
 
     // Chart visibility controls
     const [showCaffeine, setShowCaffeine] = useState(true);
     const [showAlertness, setShowAlertness] = useState(true);
     const [showThreshold, setShowThreshold] = useState(false);
+
+    // === AppState: fix frozen chart when returning from background ===
+    const appState = useRef(AppState.currentState);
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+            if (appState.current.match(/inactive|background/) && nextState === 'active') {
+                // App came to foreground — snap chart to present
+                refreshCurrentLevel();
+            }
+            if (nextState === 'background') {
+                // Going to background — push latest data to home screen widget
+                refreshWidget().catch(() => { });
+            }
+            appState.current = nextState;
+        });
+        return () => subscription.remove();
+    }, [refreshCurrentLevel]);
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -68,6 +90,7 @@ export default function Dashboard() {
                             )}
 
                             <DecayChart
+                                key={lastRefreshed}
                                 showCaffeine={showCaffeine}
                                 showAlertness={showAlertness}
                                 showThreshold={showThreshold}
@@ -75,7 +98,7 @@ export default function Dashboard() {
                         </GlassmorphicCard>
                     )}
 
-                    {FEATURES.DETAILED_STATS && (
+                    {(FEATURES.DETAILED_STATS || isProDebug) && (
                         <TouchableOpacity
                             style={[styles.detailsButton, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: colors.border }]}
                             onPress={() => router.push('./detailed-stats' as any)}

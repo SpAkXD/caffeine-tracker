@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateStackedCaffeine, calculateAlertness, calculateClearanceTime, Dose } from '../utils/math';
 import { addHours, subHours, subDays, startOfDay, format, isSameDay } from 'date-fns';
 import { refreshWidget } from '../widget/refreshWidget';
+import { scheduleThresholdNotification, cancelAllNotifications } from '../services/notificationService';
 
 interface DailyStats {
     date: string; // 'YYYY-MM-DD'
@@ -40,6 +41,10 @@ interface CaffeineState {
     clearDoses: () => void;
     cleanupOldDoses: () => void;
     refreshCurrentLevel: () => void; // Recalculate currentLevel + clearanceTime from Date.now()
+
+    // Developer Pro Mode
+    isProDebug: boolean;
+    toggleProDebug: () => void;
 
     // Selectors (still available for backward compat)
     getCurrentLevel: () => number;
@@ -82,6 +87,9 @@ export const useCaffeineStore = create<CaffeineState>()(
             clearanceTime: null,
             lastRefreshed: 0,
 
+            // Developer Pro Mode
+            isProDebug: false,
+
             addDose: (mg, timestamp = Date.now()) => {
                 set((state) => ({
                     doses: [
@@ -120,9 +128,15 @@ export const useCaffeineStore = create<CaffeineState>()(
             },
 
             toggleNotifications: () => {
-                set((state) => ({
-                    notificationsEnabled: !state.notificationsEnabled,
-                }));
+                const wasEnabled = get().notificationsEnabled;
+                set({ notificationsEnabled: !wasEnabled });
+                if (wasEnabled) {
+                    // Turning OFF — cancel any pending notifications
+                    cancelAllNotifications().catch(() => { });
+                } else {
+                    // Turning ON — schedule immediately based on current state
+                    get().refreshCurrentLevel();
+                }
             },
 
             setSleepQuality: (quality) => {
@@ -135,6 +149,10 @@ export const useCaffeineStore = create<CaffeineState>()(
 
             setBedtime: (hour) => {
                 set({ bedtimeHour: Math.max(0, Math.min(23, hour)) });
+            },
+
+            toggleProDebug: () => {
+                set((state) => ({ isProDebug: !state.isProDebug }));
             },
 
             clearDoses: () => {
@@ -151,7 +169,7 @@ export const useCaffeineStore = create<CaffeineState>()(
 
             // === REFRESH: Single calculation point ===
             refreshCurrentLevel: () => {
-                const { doses, sleepThresholdMg } = get();
+                const { doses, sleepThresholdMg, notificationsEnabled } = get();
                 const effectiveHalfLife = get().getEffectiveHalfLife();
                 const now = Date.now();
                 const level = calculateStackedCaffeine(doses, now, effectiveHalfLife);
@@ -161,6 +179,11 @@ export const useCaffeineStore = create<CaffeineState>()(
                     clearanceTime: clearance,
                     lastRefreshed: now,
                 });
+
+                // Reschedule threshold notification if notifications are ON
+                if (notificationsEnabled) {
+                    scheduleThresholdNotification(clearance, sleepThresholdMg).catch(() => { });
+                }
             },
 
             getEffectiveHalfLife: () => {

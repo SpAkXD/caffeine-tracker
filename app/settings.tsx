@@ -33,6 +33,8 @@ export default function SettingsScreen() {
     const notificationFrequency = useCaffeineStore(state => state.notificationFrequency);
     const setNotificationFrequency = useCaffeineStore(state => state.setNotificationFrequency);
     const getCurrentLevel = useCaffeineStore(state => state.getCurrentLevel);
+    const isProDebug = useCaffeineStore(state => state.isProDebug);
+    const toggleProDebug = useCaffeineStore(state => state.toggleProDebug);
 
     const colors = Colors[theme];
 
@@ -182,7 +184,7 @@ export default function SettingsScreen() {
                                                     borderColor: colors.border,
                                                 },
                                                 notificationFrequency === freq && {
-                                                    backgroundColor: theme === 'dark' ? 'rgba(0, 240, 255, 0.2)' : 'rgba(0, 122, 255, 0.2)',
+                                                    backgroundColor: colors.primary,
                                                     borderColor: colors.primary,
                                                 },
                                             ]}
@@ -192,7 +194,7 @@ export default function SettingsScreen() {
                                                 style={[
                                                     styles.frequencyText,
                                                     { color: colors.textSecondary },
-                                                    notificationFrequency === freq && { color: colors.primary, fontWeight: '700' },
+                                                    notificationFrequency === freq && { color: '#FFFFFF', fontWeight: '700' },
                                                 ]}
                                             >
                                                 {freq}h
@@ -313,14 +315,33 @@ export default function SettingsScreen() {
                     />
                 )}
 
-                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.1.3</Text>
+                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.2.0</Text>
 
                 {/* Widget Preview */}
-                {FEATURES.WIDGET_PREVIEW && (
+                {(FEATURES.WIDGET_PREVIEW || isProDebug) && (
                     <GlassmorphicCard style={{ ...styles.card, marginTop: 20 }}>
                         <WidgetPreview />
                     </GlassmorphicCard>
                 )}
+
+                {/* Developer Pro Mode Toggle */}
+                <TouchableOpacity
+                    style={[
+                        styles.devToggle,
+                        {
+                            borderColor: isProDebug ? '#FF6B35' : 'rgba(128,128,128,0.3)',
+                            backgroundColor: isProDebug ? 'rgba(255,107,53,0.12)' : 'transparent',
+                        },
+                    ]}
+                    onPress={toggleProDebug}
+                >
+                    <Ionicons name="code-slash-outline" size={18} color={isProDebug ? '#FF6B35' : colors.textSecondary} />
+                    <Text style={[styles.devToggleText, { color: isProDebug ? '#FF6B35' : colors.textSecondary }]}>
+                        DEV: Toggle Pro Mode {isProDebug ? '(ON)' : '(OFF)'}
+                    </Text>
+                </TouchableOpacity>
+
+                <View style={{ height: 40 }} />
 
             </ScrollView>
 
@@ -434,5 +455,20 @@ const styles = StyleSheet.create({
     frequencyText: {
         fontWeight: '600',
         fontSize: 15,
+    },
+    devToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 30,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 10,
+        borderWidth: 1,
+        gap: 8,
+    },
+    devToggleText: {
+        fontSize: 14,
+        fontWeight: '600',
     },
 });

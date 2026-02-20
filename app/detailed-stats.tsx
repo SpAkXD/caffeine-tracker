@@ -9,7 +9,7 @@ import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { Colors } from '../src/constants/Colors';
 import { GlassmorphicCard } from '../src/components/GlassmorphicCard';
 import { calculateStackedCaffeine, calculateAlertness } from '../src/utils/math';
-import { format } from 'date-fns';
+import { format, subDays, startOfDay } from 'date-fns';
 
 // Mini chart constants
 const CHART_W = 340;
@@ -202,6 +202,58 @@ export default function DetailedStatsScreen() {
         { icon: '🔬', label: `${effectiveHalfLife.toFixed(1)}h`, sub: `Half-life (${weightKg}kg)`, color: '#34C759' },
     ];
 
+    // === PRO STATS ===
+
+    // 7-Day Average daily caffeine intake
+    const sevenDayAverage = useMemo(() => {
+        let totalMg = 0;
+        let daysWithData = 0;
+        for (let i = 0; i < 7; i++) {
+            const dayStart = startOfDay(subDays(new Date(), i)).getTime();
+            const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+            const dayDoses = doses.filter(d => d.timestamp >= dayStart && d.timestamp < dayEnd);
+            const dayTotal = dayDoses.reduce((sum, d) => sum + d.mg, 0);
+            totalMg += dayTotal;
+            if (dayDoses.length > 0) daysWithData++;
+        }
+        return {
+            average: daysWithData > 0 ? Math.round(totalMg / 7) : 0,
+            totalMg: Math.round(totalMg),
+            daysWithData,
+        };
+    }, [doses]);
+
+    // Top Drinks — grouped by mg (proxy for drink type)
+    const topDrinks = useMemo(() => {
+        const countMap = new Map<number, number>();
+        doses.forEach(d => {
+            countMap.set(d.mg, (countMap.get(d.mg) || 0) + 1);
+        });
+        const sorted = Array.from(countMap.entries())
+            .map(([mg, count]) => ({ mg, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+        const maxCount = sorted.length > 0 ? sorted[0].count : 1;
+        return sorted.map(d => ({ ...d, pct: d.count / maxCount }));
+    }, [doses]);
+
+    // Sleep-Safe Streak — consecutive days ending bedtime below threshold
+    const sleepSafeStreak = useMemo(() => {
+        let streak = 0;
+        for (let i = 1; i <= 30; i++) { // look back up to 30 days
+            const day = subDays(new Date(), i);
+            const bedtime = new Date(day);
+            bedtime.setHours(bedtimeHour, 0, 0, 0);
+            const levelAtBedtime = calculateStackedCaffeine(doses, bedtime.getTime(), effectiveHalfLife);
+            if (levelAtBedtime <= sleepThreshold) {
+                streak++;
+            } else {
+                break;
+            }
+        }
+        return streak;
+    }, [doses, bedtimeHour, sleepThreshold, effectiveHalfLife]);
+
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <LinearGradient
@@ -302,6 +354,67 @@ export default function DetailedStatsScreen() {
                         </Svg>
                     </GlassmorphicCard>
 
+                    {/* === PRO SECTIONS === */}
+
+                    {/* 7-Day Average */}
+                    <GlassmorphicCard style={styles.proCard} intensity={12}>
+                        <View style={styles.proHeader}>
+                            <Text style={styles.proIcon}>📊</Text>
+                            <Text style={[styles.chartTitle, { color: colors.text }]}>7-Day Average</Text>
+                        </View>
+                        <Text style={[styles.proBigNumber, { color: colors.primary }]}>
+                            {sevenDayAverage.average} mg/day
+                        </Text>
+                        <Text style={[styles.proSubtext, { color: colors.textSecondary }]}>
+                            {sevenDayAverage.totalMg} mg total across {sevenDayAverage.daysWithData} active day{sevenDayAverage.daysWithData !== 1 ? 's' : ''}
+                        </Text>
+                    </GlassmorphicCard>
+
+                    {/* Top Drinks */}
+                    {topDrinks.length > 0 && (
+                        <GlassmorphicCard style={styles.proCard} intensity={12}>
+                            <View style={styles.proHeader}>
+                                <Text style={styles.proIcon}>🏆</Text>
+                                <Text style={[styles.chartTitle, { color: colors.text }]}>Top Drinks</Text>
+                            </View>
+                            {topDrinks.map((d, i) => (
+                                <View key={i} style={styles.topDrinkRow}>
+                                    <Text style={[styles.topDrinkLabel, { color: colors.text }]}>
+                                        {d.mg} mg
+                                    </Text>
+                                    <View style={styles.topDrinkBarBg}>
+                                        <View
+                                            style={[
+                                                styles.topDrinkBarFill,
+                                                {
+                                                    width: `${Math.max(d.pct * 100, 8)}%`,
+                                                    backgroundColor: i === 0 ? '#FF6B35' : i === 1 ? '#FF9500' : colors.primary,
+                                                },
+                                            ]}
+                                        />
+                                    </View>
+                                    <Text style={[styles.topDrinkCount, { color: colors.textSecondary }]}>
+                                        ×{d.count}
+                                    </Text>
+                                </View>
+                            ))}
+                        </GlassmorphicCard>
+                    )}
+
+                    {/* Sleep-Safe Streak */}
+                    <GlassmorphicCard style={styles.proCard} intensity={12}>
+                        <View style={styles.proHeader}>
+                            <Text style={styles.proIcon}>🔥</Text>
+                            <Text style={[styles.chartTitle, { color: colors.text }]}>Sleep-Safe Streak</Text>
+                        </View>
+                        <Text style={[styles.proBigNumber, { color: sleepSafeStreak >= 3 ? '#34C759' : '#FF9500' }]}>
+                            {sleepSafeStreak} day{sleepSafeStreak !== 1 ? 's' : ''}
+                        </Text>
+                        <Text style={[styles.proSubtext, { color: colors.textSecondary }]}>
+                            Consecutive days below {sleepThreshold}mg at {bedtimeHour > 12 ? bedtimeHour - 12 : bedtimeHour}:00 {bedtimeHour >= 12 ? 'PM' : 'AM'}
+                        </Text>
+                    </GlassmorphicCard>
+
                     {/* Hourly Breakdown Table */}
                     <GlassmorphicCard style={styles.tableCard} intensity={12}>
                         <Text style={[styles.chartTitle, { color: colors.text }]}>Hourly Breakdown</Text>
@@ -390,4 +503,16 @@ const styles = StyleSheet.create({
     statusCol: { flex: 1, alignItems: 'flex-end' },
     statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
     statusText: { fontSize: 11, fontWeight: '700' },
+
+    // Pro sections
+    proCard: { marginBottom: 12 },
+    proHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+    proIcon: { fontSize: 20 },
+    proBigNumber: { fontSize: 28, fontWeight: '800', marginBottom: 4 },
+    proSubtext: { fontSize: 13, lineHeight: 18 },
+    topDrinkRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+    topDrinkLabel: { width: 55, fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
+    topDrinkBarBg: { flex: 1, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,255,255,0.06)', marginHorizontal: 8, overflow: 'hidden' },
+    topDrinkBarFill: { height: '100%', borderRadius: 7 },
+    topDrinkCount: { width: 30, fontSize: 13, fontWeight: '600', textAlign: 'right', fontVariant: ['tabular-nums'] },
 });
