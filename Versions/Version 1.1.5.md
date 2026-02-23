@@ -1,4 +1,4 @@
-# Version 1.1.5 — Styled Wheel Time Picker
+# Version 1.1.5 — Custom Time Adjuster UI
 
 **Branch:** `release/v1.1.5`  
 **Date:** 2026-02-23  
@@ -8,10 +8,15 @@
 
 ## Changelog
 
-- **Replaced native Android clock UI with styled wheel time picker** — swapped `@react-native-community/datetimepicker` for `react-native-date-picker`, which renders a themed wheel-style modal that matches the app's dark/light aesthetic
-- The picker now opens as a modal overlay with Confirm / Cancel buttons, supporting both `dark` and `light` themes
-- Removed the `@react-native-community/datetimepicker` dependency and its Expo plugin entry
-- Graph and alertness curves update correctly for any selected past time (no changes needed — the chart already reacts to `doses` and `refreshCurrentLevel()`)
+- **Removed `react-native-date-picker`** — the native module caused crashes in Expo Go since it requires a custom dev build
+- **Built a 100% pure React Native time adjuster UI** directly into the Add Drink modal:
+  - Two-chip selector: "Just Now" (default) and "Custom Time"
+  - When "Custom Time" is selected, a themed hour/minute adjuster appears with chevron up/down buttons
+  - Hours adjust by ±1, minutes by ±5, with AM/PM label
+  - All times are capped at `new Date()` to prevent logging future drinks
+  - Fully styled for both dark and light themes using the existing `colors` system
+- **Also removed `@react-native-community/datetimepicker`** (replaced in v1.1.4) — no native picker dependencies remain
+- Graph and alertness curves continue to update correctly for any selected past time
 - Bumped version to `1.1.5`, versionCode to `8`
 
 ---

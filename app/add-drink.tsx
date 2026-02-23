@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert,
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import DatePicker from 'react-native-date-picker';
 import { DrinkPresetCard } from '../src/components/DrinkPresetCard';
 import { StyledButton } from '../src/components/StyledButton';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
@@ -18,7 +17,6 @@ export default function AddDrinkScreen() {
     const [customMg, setCustomMg] = useState('');
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [isCustomTime, setIsCustomTime] = useState(false);
-    const [showPicker, setShowPicker] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const [pendingDrink, setPendingDrink] = useState<{ name: string; mg: number } | null>(null);
 
@@ -39,15 +37,24 @@ export default function AddDrinkScreen() {
         return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     };
 
+    const adjustTime = (hoursToAdd: number, minutesToAdd: number) => {
+        const newDate = new Date(selectedDate);
+        newDate.setHours(newDate.getHours() + hoursToAdd);
+        newDate.setMinutes(newDate.getMinutes() + minutesToAdd);
+        const now = new Date();
+        if (newDate.getTime() > now.getTime()) {
+            setSelectedDate(now);
+        } else {
+            setSelectedDate(newDate);
+        }
+    };
+
     const showConfirmation = (name: string, mg: number) => {
         setPendingDrink({ name, mg });
         setSelectedDate(new Date());
         setIsCustomTime(false);
-        setShowPicker(false);
         setModalVisible(true);
     };
-
-
 
     const handleConfirm = () => {
         if (pendingDrink) {
@@ -71,6 +78,10 @@ export default function AddDrinkScreen() {
         }
         showConfirmation('Custom', mg);
     };
+
+    const displayHour = selectedDate.getHours() % 12 || 12;
+    const displayMinutes = selectedDate.getMinutes().toString().padStart(2, '0');
+    const displayAmPm = selectedDate.getHours() >= 12 ? 'PM' : 'AM';
 
     return (
         <View style={[styles.container, { backgroundColor: theme === 'dark' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)' }]}>
@@ -160,7 +171,6 @@ export default function AddDrinkScreen() {
                                 onPress={() => {
                                     setIsCustomTime(false);
                                     setSelectedDate(new Date());
-                                    setShowPicker(false);
                                 }}
                             >
                                 <Text
@@ -192,7 +202,6 @@ export default function AddDrinkScreen() {
                                 ]}
                                 onPress={() => {
                                     setIsCustomTime(true);
-                                    setShowPicker(true);
                                 }}
                             >
                                 <Text
@@ -210,22 +219,66 @@ export default function AddDrinkScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Styled Wheel Time Picker (modal) */}
-                        <DatePicker
-                            modal
-                            open={showPicker}
-                            date={selectedDate}
-                            mode="time"
-                            maximumDate={new Date()}
-                            theme={theme === 'dark' ? 'dark' : 'light'}
-                            onConfirm={(date) => {
-                                setShowPicker(false);
-                                setSelectedDate(date);
-                            }}
-                            onCancel={() => {
-                                setShowPicker(false);
-                            }}
-                        />
+                        {/* Custom Time Adjuster */}
+                        {isCustomTime && (
+                            <View style={[styles.adjusterContainer, {
+                                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                            }]}>
+                                {/* Hours Column */}
+                                <View style={styles.adjusterColumn}>
+                                    <TouchableOpacity
+                                        style={[styles.adjusterButton, {
+                                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                                        }]}
+                                        onPress={() => adjustTime(1, 0)}
+                                    >
+                                        <Ionicons name="chevron-up" size={28} color={colors.primary} />
+                                    </TouchableOpacity>
+                                    <Text style={[styles.adjusterValue, { color: colors.text }]}>
+                                        {displayHour}
+                                    </Text>
+                                    <TouchableOpacity
+                                        style={[styles.adjusterButton, {
+                                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                                        }]}
+                                        onPress={() => adjustTime(-1, 0)}
+                                    >
+                                        <Ionicons name="chevron-down" size={28} color={colors.primary} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Separator */}
+                                <Text style={[styles.adjusterSeparator, { color: colors.text }]}>:</Text>
+
+                                {/* Minutes Column */}
+                                <View style={styles.adjusterColumn}>
+                                    <TouchableOpacity
+                                        style={[styles.adjusterButton, {
+                                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                                        }]}
+                                        onPress={() => adjustTime(0, 5)}
+                                    >
+                                        <Ionicons name="chevron-up" size={28} color={colors.primary} />
+                                    </TouchableOpacity>
+                                    <Text style={[styles.adjusterValue, { color: colors.text }]}>
+                                        {displayMinutes}
+                                    </Text>
+                                    <TouchableOpacity
+                                        style={[styles.adjusterButton, {
+                                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                                        }]}
+                                        onPress={() => adjustTime(0, -5)}
+                                    >
+                                        <Ionicons name="chevron-down" size={28} color={colors.primary} />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* AM/PM Label */}
+                                <Text style={[styles.adjusterAmPm, { color: colors.textSecondary }]}>
+                                    {displayAmPm}
+                                </Text>
+                            </View>
+                        )}
 
                         {/* Action Buttons */}
                         <View style={styles.modalActions}>
@@ -358,6 +411,45 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         textAlign: 'center',
+    },
+    // Custom Time Adjuster styles
+    adjusterContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 16,
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        marginBottom: 24,
+        gap: 16,
+    },
+    adjusterColumn: {
+        alignItems: 'center',
+        gap: 8,
+    },
+    adjusterButton: {
+        width: 48,
+        height: 48,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    adjusterValue: {
+        fontSize: 36,
+        fontWeight: '700',
+        minWidth: 50,
+        textAlign: 'center',
+    },
+    adjusterSeparator: {
+        fontSize: 36,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    adjusterAmPm: {
+        fontSize: 18,
+        fontWeight: '600',
+        marginLeft: 4,
+        marginBottom: 4,
     },
     modalActions: {
         flexDirection: 'row',
