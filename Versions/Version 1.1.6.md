@@ -10,13 +10,18 @@
 
 ### Pure JS Scroll Wheel Time Picker
 - **Replaced chevron up/down time adjuster** with an iOS-style scroll wheel picker built entirely from React Native `FlatList`
-- Uses `snapToInterval` for smooth snapping, `onMomentumScrollEnd` for index calculation
+- Uses `snapToInterval` for smooth snapping, `onMomentumScrollEnd` + `onScrollEndDrag` for index calculation
 - **Hours wheel:** Displays 00–23 in 24h mode or 1–12 in 12h mode
 - **Minutes wheel:** Displays 00–59 (zero-padded)
 - **AM/PM wheel:** Only rendered in 12h mode
 - Selected item is styled with larger, bolder text; unselected items are smaller with reduced opacity
-- Selection indicator lines highlight the active row
+- Selection highlight band behind the active row
 - **Zero native dependencies** — works in Expo Go without custom dev builds
+
+### Wheel Picker Fixes (post-initial commit)
+- **Alignment fix:** `ITEM_HEIGHT` set to 45px, `contentContainerStyle={{ paddingVertical: ITEM_HEIGHT }}` so first/last items scroll to exact center
+- **Touch fix:** Added `nestedScrollEnabled={true}` to every FlatList, changed inner modal `Pressable` to `View` with `onStartShouldSetResponder` to stop swallowing FlatList scroll gestures, added `pointerEvents="auto"` to wheel container
+- **State sync fix:** Split into `handleHourChange`, `handleMinuteChange`, `handleAmPmChange` callbacks that each create a new `Date` from `selectedDate`, apply the change, cap at `new Date()`, and call `setSelectedDate` — the "Custom Time" chip now updates live as wheels scroll
 
 ### Global Time Format Preference
 - Added `use24HourFormat` boolean to the Zustand store (persisted, defaults to `false`)

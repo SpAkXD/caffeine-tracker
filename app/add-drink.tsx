@@ -8,7 +8,7 @@ import { StyledButton } from '../src/components/StyledButton';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { Colors } from '../src/constants/Colors';
 
-const ITEM_HEIGHT = 40;
+const ITEM_HEIGHT = 45;
 const VISIBLE_ITEMS = 3;
 const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
 
@@ -25,9 +25,6 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
     const flatListRef = useRef<FlatList>(null);
     const isUserScrolling = useRef(false);
 
-    // Pad with empty items at start and end so the first/last item can be centered
-    const paddedData = ['', ...data, ''];
-
     useEffect(() => {
         if (!isUserScrolling.current && flatListRef.current) {
             flatListRef.current.scrollToOffset({
@@ -37,7 +34,7 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
         }
     }, [selectedIndex]);
 
-    const handleMomentumScrollEnd = useCallback(
+    const handleScrollEnd = useCallback(
         (event: NativeSyntheticEvent<NativeScrollEvent>) => {
             const offsetY = event.nativeEvent.contentOffset.y;
             const index = Math.round(offsetY / ITEM_HEIGHT);
@@ -54,69 +51,53 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
 
     const renderItem = useCallback(
         ({ item, index }: { item: string; index: number }) => {
-            // Account for the padding item at index 0
-            const actualIndex = index - 1;
-            const isSelected = actualIndex === selectedIndex;
-            const isPlaceholder = item === '';
+            const isSelected = index === selectedIndex;
 
             return (
-                <View style={[wheelStyles.item, { height: ITEM_HEIGHT, width }]}>
-                    {!isPlaceholder && (
-                        <Text
-                            style={[
-                                wheelStyles.itemText,
-                                {
-                                    color: isSelected ? textColor : secondaryColor,
-                                    fontSize: isSelected ? 22 : 16,
-                                    fontWeight: isSelected ? '700' : '400',
-                                    opacity: isSelected ? 1 : 0.4,
-                                },
-                            ]}
-                        >
-                            {item}
-                        </Text>
-                    )}
+                <View style={{ height: ITEM_HEIGHT, width, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text
+                        style={{
+                            color: isSelected ? textColor : secondaryColor,
+                            fontSize: isSelected ? 24 : 16,
+                            fontWeight: isSelected ? '700' : '400',
+                            opacity: isSelected ? 1 : 0.35,
+                            textAlign: 'center',
+                        }}
+                    >
+                        {item}
+                    </Text>
                 </View>
             );
         },
         [selectedIndex, textColor, secondaryColor, width]
     );
 
+    const keyExtractor = useCallback((_: string, i: number) => i.toString(), []);
+
     return (
-        <View style={[wheelStyles.container, { height: WHEEL_HEIGHT, width }]}>
+        <View style={{ height: WHEEL_HEIGHT, width, overflow: 'hidden' }} pointerEvents="auto">
             <FlatList
                 ref={flatListRef}
-                data={paddedData}
-                keyExtractor={(_, i) => i.toString()}
+                data={data}
+                keyExtractor={keyExtractor}
                 renderItem={renderItem}
                 showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
                 snapToInterval={ITEM_HEIGHT}
                 decelerationRate="fast"
-                onMomentumScrollEnd={handleMomentumScrollEnd}
+                onMomentumScrollEnd={handleScrollEnd}
+                onScrollEndDrag={handleScrollEnd}
                 onScrollBeginDrag={handleScrollBeginDrag}
+                contentContainerStyle={{ paddingVertical: ITEM_HEIGHT }}
                 getItemLayout={(_, index) => ({
                     length: ITEM_HEIGHT,
                     offset: ITEM_HEIGHT * index,
                     index,
                 })}
-                initialScrollIndex={selectedIndex}
             />
         </View>
     );
 }
-
-const wheelStyles = StyleSheet.create({
-    container: {
-        overflow: 'hidden',
-    },
-    item: {
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    itemText: {
-        textAlign: 'center',
-    },
-});
 
 export default function AddDrinkScreen() {
     const router = useRouter();
@@ -156,30 +137,48 @@ export default function AddDrinkScreen() {
     const minuteIndex = currentMinute;
     const amPmIndex = currentHour >= 12 ? 1 : 0;
 
-    const updateDateFromWheels = (newHourIndex: number, newMinuteIndex: number, newAmPmIndex: number) => {
+    const handleHourChange = useCallback((index: number) => {
         const newDate = new Date(selectedDate);
         let hour: number;
         if (use24HourFormat) {
-            hour = newHourIndex;
+            hour = index;
         } else {
-            const display12 = newHourIndex + 1; // 1-12
-            if (newAmPmIndex === 0) { // AM
-                hour = display12 === 12 ? 0 : display12;
-            } else { // PM
+            const display12 = index + 1; // 1-12
+            const isPm = newDate.getHours() >= 12;
+            if (isPm) {
                 hour = display12 === 12 ? 12 : display12 + 12;
+            } else {
+                hour = display12 === 12 ? 0 : display12;
             }
         }
         newDate.setHours(hour);
-        newDate.setMinutes(newMinuteIndex);
         newDate.setSeconds(0, 0);
-        // Cap at now
         const now = new Date();
-        if (newDate.getTime() > now.getTime()) {
-            setSelectedDate(now);
-        } else {
-            setSelectedDate(newDate);
+        setSelectedDate(newDate.getTime() > now.getTime() ? now : newDate);
+    }, [selectedDate, use24HourFormat]);
+
+    const handleMinuteChange = useCallback((index: number) => {
+        const newDate = new Date(selectedDate);
+        newDate.setMinutes(index);
+        newDate.setSeconds(0, 0);
+        const now = new Date();
+        setSelectedDate(newDate.getTime() > now.getTime() ? now : newDate);
+    }, [selectedDate]);
+
+    const handleAmPmChange = useCallback((index: number) => {
+        const newDate = new Date(selectedDate);
+        const currentH = newDate.getHours();
+        const currentlyPm = currentH >= 12;
+        const wantPm = index === 1;
+        if (wantPm && !currentlyPm) {
+            newDate.setHours(currentH + 12);
+        } else if (!wantPm && currentlyPm) {
+            newDate.setHours(currentH - 12);
         }
-    };
+        newDate.setSeconds(0, 0);
+        const now = new Date();
+        setSelectedDate(newDate.getTime() > now.getTime() ? now : newDate);
+    }, [selectedDate]);
 
     const getTimestamp = () => {
         return selectedDate.getTime();
@@ -278,9 +277,14 @@ export default function AddDrinkScreen() {
                 onRequestClose={handleCancel}
             >
                 <Pressable style={styles.modalOverlay} onPress={handleCancel}>
-                    <Pressable style={[styles.modalCard, {
-                        backgroundColor: theme === 'dark' ? '#1C1C1E' : '#F2F2F7',
-                    }]} onPress={() => { }}>
+                    {/* Use View instead of Pressable to avoid swallowing touch events from FlatList wheels */}
+                    <View
+                        style={[styles.modalCard, {
+                            backgroundColor: theme === 'dark' ? '#1C1C1E' : '#F2F2F7',
+                        }]}
+                        onStartShouldSetResponder={() => true}
+                        onResponderRelease={() => { }}
+                    >
                         {/* Header */}
                         <Text style={[styles.modalTitle, { color: colors.text }]}>
                             Add {pendingDrink?.name}?
@@ -360,19 +364,22 @@ export default function AddDrinkScreen() {
 
                         {/* Scroll Wheel Time Picker */}
                         {isCustomTime && (
-                            <View style={[styles.wheelContainer, {
-                                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                            }]}>
-                                {/* Selection indicator line */}
+                            <View
+                                style={[styles.wheelContainer, {
+                                    backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                                }]}
+                                pointerEvents="auto"
+                            >
+                                {/* Selection indicator */}
                                 <View style={[styles.wheelIndicator, {
-                                    borderColor: theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
+                                    backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                                 }]} />
 
                                 <View style={styles.wheelRow}>
                                     <WheelPicker
                                         data={hoursData}
                                         selectedIndex={hourIndex}
-                                        onIndexChange={(i) => updateDateFromWheels(i, minuteIndex, amPmIndex)}
+                                        onIndexChange={handleHourChange}
                                         textColor={colors.text}
                                         secondaryColor={colors.textSecondary}
                                         width={use24HourFormat ? 60 : 50}
@@ -381,7 +388,7 @@ export default function AddDrinkScreen() {
                                     <WheelPicker
                                         data={minutesData}
                                         selectedIndex={minuteIndex}
-                                        onIndexChange={(i) => updateDateFromWheels(hourIndex, i, amPmIndex)}
+                                        onIndexChange={handleMinuteChange}
                                         textColor={colors.text}
                                         secondaryColor={colors.textSecondary}
                                         width={60}
@@ -390,7 +397,7 @@ export default function AddDrinkScreen() {
                                         <WheelPicker
                                             data={amPmData}
                                             selectedIndex={amPmIndex}
-                                            onIndexChange={(i) => updateDateFromWheels(hourIndex, minuteIndex, i)}
+                                            onIndexChange={handleAmPmChange}
                                             textColor={colors.text}
                                             secondaryColor={colors.textSecondary}
                                             width={50}
@@ -419,7 +426,7 @@ export default function AddDrinkScreen() {
                                 <Text style={[styles.modalButtonText, { color: '#FFFFFF', fontWeight: '800' }]}>Confirm Add</Text>
                             </TouchableOpacity>
                         </View>
-                    </Pressable>
+                    </View>
                 </Pressable>
             </Modal>
         </View>
@@ -539,15 +546,14 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         marginBottom: 24,
         position: 'relative',
+        overflow: 'hidden',
     },
     wheelIndicator: {
         position: 'absolute',
         left: 12,
         right: 12,
-        top: ITEM_HEIGHT + 12, // top padding + 1 item
+        top: ITEM_HEIGHT + 12, // paddingVertical(12) + 1 item
         height: ITEM_HEIGHT,
-        borderTopWidth: 1,
-        borderBottomWidth: 1,
         borderRadius: 8,
     },
     wheelRow: {
@@ -557,7 +563,7 @@ const styles = StyleSheet.create({
         gap: 4,
     },
     wheelSeparator: {
-        fontSize: 22,
+        fontSize: 24,
         fontWeight: '700',
     },
     modalActions: {
