@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal, Pressable } from 'react-native';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal, Pressable, FlatList, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,10 +8,121 @@ import { StyledButton } from '../src/components/StyledButton';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { Colors } from '../src/constants/Colors';
 
+const ITEM_HEIGHT = 40;
+const VISIBLE_ITEMS = 3;
+const WHEEL_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
+
+interface WheelPickerProps {
+    data: string[];
+    selectedIndex: number;
+    onIndexChange: (index: number) => void;
+    textColor: string;
+    secondaryColor: string;
+    width?: number;
+}
+
+function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryColor, width = 60 }: WheelPickerProps) {
+    const flatListRef = useRef<FlatList>(null);
+    const isUserScrolling = useRef(false);
+
+    // Pad with empty items at start and end so the first/last item can be centered
+    const paddedData = ['', ...data, ''];
+
+    useEffect(() => {
+        if (!isUserScrolling.current && flatListRef.current) {
+            flatListRef.current.scrollToOffset({
+                offset: selectedIndex * ITEM_HEIGHT,
+                animated: false,
+            });
+        }
+    }, [selectedIndex]);
+
+    const handleMomentumScrollEnd = useCallback(
+        (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            const offsetY = event.nativeEvent.contentOffset.y;
+            const index = Math.round(offsetY / ITEM_HEIGHT);
+            const clampedIndex = Math.max(0, Math.min(index, data.length - 1));
+            isUserScrolling.current = false;
+            onIndexChange(clampedIndex);
+        },
+        [data.length, onIndexChange]
+    );
+
+    const handleScrollBeginDrag = useCallback(() => {
+        isUserScrolling.current = true;
+    }, []);
+
+    const renderItem = useCallback(
+        ({ item, index }: { item: string; index: number }) => {
+            // Account for the padding item at index 0
+            const actualIndex = index - 1;
+            const isSelected = actualIndex === selectedIndex;
+            const isPlaceholder = item === '';
+
+            return (
+                <View style={[wheelStyles.item, { height: ITEM_HEIGHT, width }]}>
+                    {!isPlaceholder && (
+                        <Text
+                            style={[
+                                wheelStyles.itemText,
+                                {
+                                    color: isSelected ? textColor : secondaryColor,
+                                    fontSize: isSelected ? 22 : 16,
+                                    fontWeight: isSelected ? '700' : '400',
+                                    opacity: isSelected ? 1 : 0.4,
+                                },
+                            ]}
+                        >
+                            {item}
+                        </Text>
+                    )}
+                </View>
+            );
+        },
+        [selectedIndex, textColor, secondaryColor, width]
+    );
+
+    return (
+        <View style={[wheelStyles.container, { height: WHEEL_HEIGHT, width }]}>
+            <FlatList
+                ref={flatListRef}
+                data={paddedData}
+                keyExtractor={(_, i) => i.toString()}
+                renderItem={renderItem}
+                showsVerticalScrollIndicator={false}
+                snapToInterval={ITEM_HEIGHT}
+                decelerationRate="fast"
+                onMomentumScrollEnd={handleMomentumScrollEnd}
+                onScrollBeginDrag={handleScrollBeginDrag}
+                getItemLayout={(_, index) => ({
+                    length: ITEM_HEIGHT,
+                    offset: ITEM_HEIGHT * index,
+                    index,
+                })}
+                initialScrollIndex={selectedIndex}
+            />
+        </View>
+    );
+}
+
+const wheelStyles = StyleSheet.create({
+    container: {
+        overflow: 'hidden',
+    },
+    item: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    itemText: {
+        textAlign: 'center',
+    },
+});
+
 export default function AddDrinkScreen() {
     const router = useRouter();
     const addDose = useCaffeineStore(state => state.addDose);
     const theme = useCaffeineStore(state => state.theme);
+    const use24HourFormat = useCaffeineStore(state => state.use24HourFormat);
     const colors = Colors[theme];
 
     const [customMg, setCustomMg] = useState('');
@@ -29,24 +140,56 @@ export default function AddDrinkScreen() {
         { name: 'Double Shot', mg: 126 },
     ];
 
-    const getTimestamp = () => {
-        return selectedDate.getTime();
-    };
+    // Generate wheel data
+    const hoursData = use24HourFormat
+        ? Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'))
+        : Array.from({ length: 12 }, (_, i) => (i + 1).toString());
+    const minutesData = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+    const amPmData = ['AM', 'PM'];
 
-    const formatTime = (date: Date) => {
-        return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    };
+    // Derive selected indices from selectedDate
+    const currentHour = selectedDate.getHours();
+    const currentMinute = selectedDate.getMinutes();
+    const hourIndex = use24HourFormat
+        ? currentHour
+        : (currentHour % 12 === 0 ? 11 : (currentHour % 12) - 1);
+    const minuteIndex = currentMinute;
+    const amPmIndex = currentHour >= 12 ? 1 : 0;
 
-    const adjustTime = (hoursToAdd: number, minutesToAdd: number) => {
+    const updateDateFromWheels = (newHourIndex: number, newMinuteIndex: number, newAmPmIndex: number) => {
         const newDate = new Date(selectedDate);
-        newDate.setHours(newDate.getHours() + hoursToAdd);
-        newDate.setMinutes(newDate.getMinutes() + minutesToAdd);
+        let hour: number;
+        if (use24HourFormat) {
+            hour = newHourIndex;
+        } else {
+            const display12 = newHourIndex + 1; // 1-12
+            if (newAmPmIndex === 0) { // AM
+                hour = display12 === 12 ? 0 : display12;
+            } else { // PM
+                hour = display12 === 12 ? 12 : display12 + 12;
+            }
+        }
+        newDate.setHours(hour);
+        newDate.setMinutes(newMinuteIndex);
+        newDate.setSeconds(0, 0);
+        // Cap at now
         const now = new Date();
         if (newDate.getTime() > now.getTime()) {
             setSelectedDate(now);
         } else {
             setSelectedDate(newDate);
         }
+    };
+
+    const getTimestamp = () => {
+        return selectedDate.getTime();
+    };
+
+    const formatTime = (date: Date) => {
+        if (use24HourFormat) {
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+        return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     };
 
     const showConfirmation = (name: string, mg: number) => {
@@ -78,10 +221,6 @@ export default function AddDrinkScreen() {
         }
         showConfirmation('Custom', mg);
     };
-
-    const displayHour = selectedDate.getHours() % 12 || 12;
-    const displayMinutes = selectedDate.getMinutes().toString().padStart(2, '0');
-    const displayAmPm = selectedDate.getHours() >= 12 ? 'PM' : 'AM';
 
     return (
         <View style={[styles.container, { backgroundColor: theme === 'dark' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)' }]}>
@@ -219,64 +358,45 @@ export default function AddDrinkScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Custom Time Adjuster */}
+                        {/* Scroll Wheel Time Picker */}
                         {isCustomTime && (
-                            <View style={[styles.adjusterContainer, {
+                            <View style={[styles.wheelContainer, {
                                 backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
                             }]}>
-                                {/* Hours Column */}
-                                <View style={styles.adjusterColumn}>
-                                    <TouchableOpacity
-                                        style={[styles.adjusterButton, {
-                                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                                        }]}
-                                        onPress={() => adjustTime(1, 0)}
-                                    >
-                                        <Ionicons name="chevron-up" size={28} color={colors.primary} />
-                                    </TouchableOpacity>
-                                    <Text style={[styles.adjusterValue, { color: colors.text }]}>
-                                        {displayHour}
-                                    </Text>
-                                    <TouchableOpacity
-                                        style={[styles.adjusterButton, {
-                                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                                        }]}
-                                        onPress={() => adjustTime(-1, 0)}
-                                    >
-                                        <Ionicons name="chevron-down" size={28} color={colors.primary} />
-                                    </TouchableOpacity>
+                                {/* Selection indicator line */}
+                                <View style={[styles.wheelIndicator, {
+                                    borderColor: theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
+                                }]} />
+
+                                <View style={styles.wheelRow}>
+                                    <WheelPicker
+                                        data={hoursData}
+                                        selectedIndex={hourIndex}
+                                        onIndexChange={(i) => updateDateFromWheels(i, minuteIndex, amPmIndex)}
+                                        textColor={colors.text}
+                                        secondaryColor={colors.textSecondary}
+                                        width={use24HourFormat ? 60 : 50}
+                                    />
+                                    <Text style={[styles.wheelSeparator, { color: colors.text }]}>:</Text>
+                                    <WheelPicker
+                                        data={minutesData}
+                                        selectedIndex={minuteIndex}
+                                        onIndexChange={(i) => updateDateFromWheels(hourIndex, i, amPmIndex)}
+                                        textColor={colors.text}
+                                        secondaryColor={colors.textSecondary}
+                                        width={60}
+                                    />
+                                    {!use24HourFormat && (
+                                        <WheelPicker
+                                            data={amPmData}
+                                            selectedIndex={amPmIndex}
+                                            onIndexChange={(i) => updateDateFromWheels(hourIndex, minuteIndex, i)}
+                                            textColor={colors.text}
+                                            secondaryColor={colors.textSecondary}
+                                            width={50}
+                                        />
+                                    )}
                                 </View>
-
-                                {/* Separator */}
-                                <Text style={[styles.adjusterSeparator, { color: colors.text }]}>:</Text>
-
-                                {/* Minutes Column */}
-                                <View style={styles.adjusterColumn}>
-                                    <TouchableOpacity
-                                        style={[styles.adjusterButton, {
-                                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                                        }]}
-                                        onPress={() => adjustTime(0, 5)}
-                                    >
-                                        <Ionicons name="chevron-up" size={28} color={colors.primary} />
-                                    </TouchableOpacity>
-                                    <Text style={[styles.adjusterValue, { color: colors.text }]}>
-                                        {displayMinutes}
-                                    </Text>
-                                    <TouchableOpacity
-                                        style={[styles.adjusterButton, {
-                                            backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                                        }]}
-                                        onPress={() => adjustTime(0, -5)}
-                                    >
-                                        <Ionicons name="chevron-down" size={28} color={colors.primary} />
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* AM/PM Label */}
-                                <Text style={[styles.adjusterAmPm, { color: colors.textSecondary }]}>
-                                    {displayAmPm}
-                                </Text>
                             </View>
                         )}
 
@@ -412,44 +532,33 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         textAlign: 'center',
     },
-    // Custom Time Adjuster styles
-    adjusterContainer: {
+    // Scroll Wheel Picker styles
+    wheelContainer: {
+        borderRadius: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        marginBottom: 24,
+        position: 'relative',
+    },
+    wheelIndicator: {
+        position: 'absolute',
+        left: 12,
+        right: 12,
+        top: ITEM_HEIGHT + 12, // top padding + 1 item
+        height: ITEM_HEIGHT,
+        borderTopWidth: 1,
+        borderBottomWidth: 1,
+        borderRadius: 8,
+    },
+    wheelRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 16,
-        paddingVertical: 16,
-        paddingHorizontal: 24,
-        marginBottom: 24,
-        gap: 16,
+        gap: 4,
     },
-    adjusterColumn: {
-        alignItems: 'center',
-        gap: 8,
-    },
-    adjusterButton: {
-        width: 48,
-        height: 48,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    adjusterValue: {
-        fontSize: 36,
+    wheelSeparator: {
+        fontSize: 22,
         fontWeight: '700',
-        minWidth: 50,
-        textAlign: 'center',
-    },
-    adjusterSeparator: {
-        fontSize: 36,
-        fontWeight: '700',
-        marginBottom: 4,
-    },
-    adjusterAmPm: {
-        fontSize: 18,
-        fontWeight: '600',
-        marginLeft: 4,
-        marginBottom: 4,
     },
     modalActions: {
         flexDirection: 'row',

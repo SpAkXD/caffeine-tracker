@@ -28,6 +28,8 @@ export default function SettingsScreen() {
     const clearDoses = useCaffeineStore(state => state.clearDoses);
     const theme = useCaffeineStore(state => state.theme);
     const toggleTheme = useCaffeineStore(state => state.toggleTheme);
+    const use24HourFormat = useCaffeineStore(state => state.use24HourFormat);
+    const toggleTimeFormat = useCaffeineStore(state => state.toggleTimeFormat);
     const notificationsEnabled = useCaffeineStore(state => state.notificationsEnabled);
     const toggleNotifications = useCaffeineStore(state => state.toggleNotifications);
     const notificationFrequency = useCaffeineStore(state => state.notificationFrequency);
@@ -140,6 +142,18 @@ export default function SettingsScreen() {
                                 <Switch
                                     value={theme === 'dark'}
                                     onValueChange={toggleTheme}
+                                    trackColor={{ false: '#767577', true: colors.primary }}
+                                    thumbColor="#f4f3f4"
+                                />
+                            </View>
+                        </View>
+                        <View style={[styles.row, { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' }]}>
+                            <Text style={[styles.label, { color: colors.primary, marginBottom: 0 }]}>Time Format</Text>
+                            <View style={styles.switchRow}>
+                                <Text style={[styles.switchLabel, { color: colors.text }]}>{use24HourFormat ? '24-Hour' : '12-Hour'}</Text>
+                                <Switch
+                                    value={use24HourFormat}
+                                    onValueChange={toggleTimeFormat}
                                     trackColor={{ false: '#767577', true: colors.primary }}
                                     thumbColor="#f4f3f4"
                                 />
@@ -313,7 +327,7 @@ export default function SettingsScreen() {
                     />
                 )}
 
-                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.1.3</Text>
+                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.1.6</Text>
 
                 {/* Widget Preview */}
                 {FEATURES.WIDGET_PREVIEW && (

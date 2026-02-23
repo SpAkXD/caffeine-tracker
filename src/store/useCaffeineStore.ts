@@ -21,6 +21,7 @@ interface CaffeineState {
     notificationFrequency: 1 | 3 | 6; // hours between notifications
     sleepQuality: 'great' | 'average' | 'poor';
     bedtimeHour: number; // 0-23, default 22 (10 PM)
+    use24HourFormat: boolean; // 12h vs 24h time display
 
     // === SINGLE SOURCE OF TRUTH ===
     // These are computed once and shared across all components.
@@ -33,6 +34,7 @@ interface CaffeineState {
     removeDose: (id: string) => void;
     updateSettings: (settings: { halfLife?: number; threshold?: number; weight?: number }) => void;
     toggleTheme: () => void;
+    toggleTimeFormat: () => void;
     toggleNotifications: () => void;
     setNotificationFrequency: (frequency: 1 | 3 | 6) => void;
     setSleepQuality: (quality: 'great' | 'average' | 'poor') => void;
@@ -76,6 +78,7 @@ export const useCaffeineStore = create<CaffeineState>()(
             notificationFrequency: 3,
             sleepQuality: 'great',
             bedtimeHour: 22,
+            use24HourFormat: false,
 
             // === Single Source of Truth state ===
             currentLevel: 0,
@@ -116,6 +119,12 @@ export const useCaffeineStore = create<CaffeineState>()(
             toggleTheme: () => {
                 set((state) => ({
                     theme: state.theme === 'dark' ? 'light' : 'dark',
+                }));
+            },
+
+            toggleTimeFormat: () => {
+                set((state) => ({
+                    use24HourFormat: !state.use24HourFormat,
                 }));
             },
 
