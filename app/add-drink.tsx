@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import DatePicker from 'react-native-date-picker';
 import { DrinkPresetCard } from '../src/components/DrinkPresetCard';
 import { StyledButton } from '../src/components/StyledButton';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
@@ -47,12 +47,7 @@ export default function AddDrinkScreen() {
         setModalVisible(true);
     };
 
-    const handlePickerChange = (_event: DateTimePickerEvent, date?: Date) => {
-        setShowPicker(Platform.OS === 'ios');
-        if (date) {
-            setSelectedDate(date);
-        }
-    };
+
 
     const handleConfirm = () => {
         if (pendingDrink) {
@@ -215,15 +210,22 @@ export default function AddDrinkScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Native DateTimePicker */}
-                        {showPicker && (
-                            <DateTimePicker
-                                value={selectedDate}
-                                mode="time"
-                                maximumDate={new Date()}
-                                onChange={handlePickerChange}
-                            />
-                        )}
+                        {/* Styled Wheel Time Picker (modal) */}
+                        <DatePicker
+                            modal
+                            open={showPicker}
+                            date={selectedDate}
+                            mode="time"
+                            maximumDate={new Date()}
+                            theme={theme === 'dark' ? 'dark' : 'light'}
+                            onConfirm={(date) => {
+                                setShowPicker(false);
+                                setSelectedDate(date);
+                            }}
+                            onCancel={() => {
+                                setShowPicker(false);
+                            }}
+                        />
 
                         {/* Action Buttons */}
                         <View style={styles.modalActions}>
