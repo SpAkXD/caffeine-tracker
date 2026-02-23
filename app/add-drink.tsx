@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal, Pressable, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { DrinkPresetCard } from '../src/components/DrinkPresetCard';
 import { StyledButton } from '../src/components/StyledButton';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { Colors } from '../src/constants/Colors';
-
-type TimeOption = 'now' | '30m' | '1h';
 
 export default function AddDrinkScreen() {
     const router = useRouter();
@@ -17,7 +16,9 @@ export default function AddDrinkScreen() {
     const colors = Colors[theme];
 
     const [customMg, setCustomMg] = useState('');
-    const [selectedTime, setSelectedTime] = useState<TimeOption>('now');
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [isCustomTime, setIsCustomTime] = useState(false);
+    const [showPicker, setShowPicker] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const [pendingDrink, setPendingDrink] = useState<{ name: string; mg: number } | null>(null);
 
@@ -31,16 +32,26 @@ export default function AddDrinkScreen() {
     ];
 
     const getTimestamp = () => {
-        let timestamp = Date.now();
-        if (selectedTime === '30m') timestamp -= 30 * 60 * 1000;
-        if (selectedTime === '1h') timestamp -= 60 * 60 * 1000;
-        return timestamp;
+        return selectedDate.getTime();
+    };
+
+    const formatTime = (date: Date) => {
+        return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     };
 
     const showConfirmation = (name: string, mg: number) => {
         setPendingDrink({ name, mg });
-        setSelectedTime('now'); // Reset time selection each time
+        setSelectedDate(new Date());
+        setIsCustomTime(false);
+        setShowPicker(false);
         setModalVisible(true);
+    };
+
+    const handlePickerChange = (_event: DateTimePickerEvent, date?: Date) => {
+        setShowPicker(Platform.OS === 'ios');
+        if (date) {
+            setSelectedDate(date);
+        }
     };
 
     const handleConfirm = () => {
@@ -138,42 +149,81 @@ export default function AddDrinkScreen() {
                             When did you drink it?
                         </Text>
                         <View style={styles.modalTimeRow}>
-                            {(['now', '30m', '1h'] as TimeOption[]).map((opt) => {
-                                const isActive = selectedTime === opt;
-                                return (
-                                    <TouchableOpacity
-                                        key={opt}
-                                        style={[
-                                            styles.modalTimeChip,
-                                            {
-                                                backgroundColor: isActive
-                                                    ? colors.primary
-                                                    : 'rgba(255,255,255,0.1)',
-                                                borderColor: isActive
-                                                    ? colors.primary
-                                                    : 'rgba(255,255,255,0.1)',
-                                            },
-                                        ]}
-                                        onPress={() => setSelectedTime(opt)}
-                                    >
-                                        <Text
-                                            numberOfLines={1}
-                                            style={[
-                                                styles.modalTimeText,
-                                                {
-                                                    color: isActive
-                                                        ? '#FFFFFF'
-                                                        : '#A1A1AA',
-                                                    fontWeight: isActive ? '700' : '600',
-                                                },
-                                            ]}
-                                        >
-                                            {opt === 'now' ? 'Just Now' : `${opt} ago`}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
+                            {/* Chip 1: Just Now */}
+                            <TouchableOpacity
+                                style={[
+                                    styles.modalTimeChip,
+                                    {
+                                        backgroundColor: !isCustomTime
+                                            ? colors.primary
+                                            : 'rgba(255,255,255,0.1)',
+                                        borderColor: !isCustomTime
+                                            ? colors.primary
+                                            : 'rgba(255,255,255,0.1)',
+                                    },
+                                ]}
+                                onPress={() => {
+                                    setIsCustomTime(false);
+                                    setSelectedDate(new Date());
+                                    setShowPicker(false);
+                                }}
+                            >
+                                <Text
+                                    numberOfLines={1}
+                                    style={[
+                                        styles.modalTimeText,
+                                        {
+                                            color: !isCustomTime ? '#FFFFFF' : '#A1A1AA',
+                                            fontWeight: !isCustomTime ? '700' : '600',
+                                        },
+                                    ]}
+                                >
+                                    Just Now
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* Chip 2: Custom Time */}
+                            <TouchableOpacity
+                                style={[
+                                    styles.modalTimeChip,
+                                    {
+                                        backgroundColor: isCustomTime
+                                            ? colors.primary
+                                            : 'rgba(255,255,255,0.1)',
+                                        borderColor: isCustomTime
+                                            ? colors.primary
+                                            : 'rgba(255,255,255,0.1)',
+                                    },
+                                ]}
+                                onPress={() => {
+                                    setIsCustomTime(true);
+                                    setShowPicker(true);
+                                }}
+                            >
+                                <Text
+                                    numberOfLines={1}
+                                    style={[
+                                        styles.modalTimeText,
+                                        {
+                                            color: isCustomTime ? '#FFFFFF' : '#A1A1AA',
+                                            fontWeight: isCustomTime ? '700' : '600',
+                                        },
+                                    ]}
+                                >
+                                    {isCustomTime ? formatTime(selectedDate) : 'Pick Time'}
+                                </Text>
+                            </TouchableOpacity>
                         </View>
+
+                        {/* Native DateTimePicker */}
+                        {showPicker && (
+                            <DateTimePicker
+                                value={selectedDate}
+                                mode="time"
+                                maximumDate={new Date()}
+                                onChange={handlePickerChange}
+                            />
+                        )}
 
                         {/* Action Buttons */}
                         <View style={styles.modalActions}>

@@ -11,7 +11,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
                 "color": "#FF6B35",
                 "sounds": []
             }
-        ]
+        ],
+        "@react-native-community/datetimepicker"
     ];
 
     if (FEATURES.HOME_WIDGET) {
@@ -38,7 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         ...config,
         name: "Caffeine Tracker",
         slug: "caffeine-tracker",
-        version: "1.1.3",
+        version: "1.1.4",
         orientation: "portrait",
         icon: "./assets/images/icon.png",
         scheme: "caffinetracker",
@@ -65,7 +66,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             permissions: [
                 "android.permission.POST_NOTIFICATIONS"
             ],
-            versionCode: 6
+            versionCode: 7
         },
         web: {
             bundler: "metro",
