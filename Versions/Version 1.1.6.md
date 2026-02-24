@@ -33,7 +33,24 @@
 - Refactored `WheelPicker` to use `Animated.FlatList` with continuous scroll-position interpolation
 - Each item smoothly animates **scale** (0.75 → 1.15 at center) and **opacity** (0.15 → 1.0) as it scrolls, creating an iOS-style 3D drum effect at 60fps via `useNativeDriver: true`
 - Added `expo-haptics` light impact trigger on snap to a new index
-- Physics tuning: `bounces={false}`, `overScrollMode="never"`, `decelerationRate="fast"`, `snapToInterval={ITEM_HEIGHT}` for tight, premium scrolling
+- Physics tuning: `bounces={false}`, `overScrollMode="never"`, `decelerationRate="fast"`, `snapToOffsets` array for tight, premium scrolling
+
+### Wheel Picker Snap Physics Fix
+- Replaced `snapToInterval` with `snapToOffsets` (exact per-item offset array) + `snapToAlignment="center"` for guaranteed snap
+- Added force-correction in `handleScrollEnd`: if final offset is >1px from the nearest item, `scrollToOffset` with `animated: true` forces exact alignment
+- Ensures no matter how fast the user flicks, the wheel always settles exactly on an item
+
+### Modal Button Contrast Fix
+- Active time chip text changed from `#FFFFFF` to `#1C1C1E` (dark on primary) with `fontWeight: '800'`
+- "Confirm Add" button text changed from `#FFFFFF` to `#1C1C1E` with `fontWeight: '800'`
+- Inactive chips retain translucent background with `#A1A1AA` text
+
+### Pure-JS "More Drinks" Dropdown
+- New expandable section between Quick Presets and Custom Amount
+- Closed state: glassmorphic bar showing "Select a drink..." with chevron icon
+- Expanded state: scrollable list of 10 additional drinks (Green Tea 25mg, Black Tea 47mg, Pre-workout 200mg, Iced Coffee 120mg, Filter Coffee 140mg, Diet Cola 46mg, Chocolate 10mg, Decaf 5mg, Nitro Cold Brew 215mg, Yerba Mate 85mg)
+- Items have hairline separators, theme-aware colors, and trigger `showConfirmation` on tap
+- Zero native dependencies — pure React Native components only
 
 ### Other
 - Bumped version to `1.1.6`, versionCode to `9`

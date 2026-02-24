@@ -80,6 +80,9 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
     const isUserScrolling = useRef(false);
     const lastSnappedIndex = useRef(selectedIndex);
 
+    // Generate exact snap offsets for every item
+    const snapOffsets = data.map((_, i) => i * ITEM_HEIGHT);
+
     useEffect(() => {
         if (!isUserScrolling.current && flatListRef.current) {
             (flatListRef.current as any).scrollToOffset({
@@ -94,6 +97,16 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
             const offsetY = event.nativeEvent.contentOffset.y;
             const index = Math.round(offsetY / ITEM_HEIGHT);
             const clampedIndex = Math.max(0, Math.min(index, data.length - 1));
+            const targetOffset = clampedIndex * ITEM_HEIGHT;
+
+            // Force-correct to exact offset if not perfectly aligned
+            if (Math.abs(offsetY - targetOffset) > 1 && flatListRef.current) {
+                (flatListRef.current as any).scrollToOffset({
+                    offset: targetOffset,
+                    animated: true,
+                });
+            }
+
             isUserScrolling.current = false;
             if (clampedIndex !== lastSnappedIndex.current) {
                 lastSnappedIndex.current = clampedIndex;
@@ -139,7 +152,8 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
                 nestedScrollEnabled={true}
                 scrollEnabled={true}
                 keyboardShouldPersistTaps="handled"
-                snapToInterval={ITEM_HEIGHT}
+                snapToOffsets={snapOffsets}
+                snapToAlignment="center"
                 decelerationRate="fast"
                 bounces={false}
                 overScrollMode="never"
@@ -159,6 +173,20 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
     );
 }
 
+// More Drinks data
+const MORE_DRINKS = [
+    { name: 'Green Tea', mg: 25 },
+    { name: 'Black Tea', mg: 47 },
+    { name: 'Pre-workout', mg: 200 },
+    { name: 'Iced Coffee', mg: 120 },
+    { name: 'Filter Coffee', mg: 140 },
+    { name: 'Diet Cola', mg: 46 },
+    { name: 'Chocolate', mg: 10 },
+    { name: 'Decaf', mg: 5 },
+    { name: 'Nitro Cold Brew', mg: 215 },
+    { name: 'Yerba Mate', mg: 85 },
+];
+
 export default function AddDrinkScreen() {
     const router = useRouter();
     const addDose = useCaffeineStore(state => state.addDose);
@@ -171,6 +199,7 @@ export default function AddDrinkScreen() {
     const [isCustomTime, setIsCustomTime] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const [pendingDrink, setPendingDrink] = useState<{ name: string; mg: number } | null>(null);
+    const [moreDrinksOpen, setMoreDrinksOpen] = useState(false);
 
     const PRESETS = [
         { name: 'Espresso', mg: 63 },
@@ -306,6 +335,53 @@ export default function AddDrinkScreen() {
                     ))}
                 </View>
 
+                {/* More Drinks Dropdown */}
+                <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>More Drinks</Text>
+                <TouchableOpacity
+                    style={[styles.dropdownBar, {
+                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                        borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                    }]}
+                    onPress={() => setMoreDrinksOpen(!moreDrinksOpen)}
+                    activeOpacity={0.7}
+                >
+                    <Text style={[styles.dropdownBarText, { color: moreDrinksOpen ? colors.text : colors.textSecondary }]}>
+                        {moreDrinksOpen ? 'Hide drinks' : 'Select a drink...'}
+                    </Text>
+                    <Ionicons
+                        name={moreDrinksOpen ? 'chevron-up' : 'chevron-down'}
+                        size={20}
+                        color={colors.textSecondary}
+                    />
+                </TouchableOpacity>
+                {moreDrinksOpen && (
+                    <View style={[styles.dropdownList, {
+                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+                        borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                    }]}>
+                        {MORE_DRINKS.map((drink, idx) => (
+                            <TouchableOpacity
+                                key={drink.name}
+                                style={[
+                                    styles.dropdownItem,
+                                    idx < MORE_DRINKS.length - 1 && {
+                                        borderBottomWidth: StyleSheet.hairlineWidth,
+                                        borderBottomColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+                                    },
+                                ]}
+                                onPress={() => {
+                                    setMoreDrinksOpen(false);
+                                    showConfirmation(drink.name, drink.mg);
+                                }}
+                                activeOpacity={0.6}
+                            >
+                                <Text style={[styles.dropdownItemName, { color: colors.text }]}>{drink.name}</Text>
+                                <Text style={[styles.dropdownItemMg, { color: colors.textSecondary }]}>{drink.mg}mg</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                )}
+
                 <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Custom Amount</Text>
                 <View style={styles.customRow}>
                     <TextInput
@@ -382,8 +458,8 @@ export default function AddDrinkScreen() {
                                     style={[
                                         styles.modalTimeText,
                                         {
-                                            color: !isCustomTime ? '#FFFFFF' : '#A1A1AA',
-                                            fontWeight: !isCustomTime ? '700' : '600',
+                                            color: !isCustomTime ? '#1C1C1E' : '#A1A1AA',
+                                            fontWeight: !isCustomTime ? '800' : '600',
                                         },
                                     ]}
                                 >
@@ -413,8 +489,8 @@ export default function AddDrinkScreen() {
                                     style={[
                                         styles.modalTimeText,
                                         {
-                                            color: isCustomTime ? '#FFFFFF' : '#A1A1AA',
-                                            fontWeight: isCustomTime ? '700' : '600',
+                                            color: isCustomTime ? '#1C1C1E' : '#A1A1AA',
+                                            fontWeight: isCustomTime ? '800' : '600',
                                         },
                                     ]}
                                 >
@@ -483,7 +559,7 @@ export default function AddDrinkScreen() {
                                 }]}
                                 onPress={handleConfirm}
                             >
-                                <Text style={[styles.modalButtonText, { color: '#FFFFFF', fontWeight: '800' }]}>Confirm Add</Text>
+                                <Text style={[styles.modalButtonText, { color: '#1C1C1E', fontWeight: '800' }]}>Confirm Add</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -541,6 +617,42 @@ const styles = StyleSheet.create({
     },
     addButton: {
         minWidth: 100,
+    },
+    // More Drinks dropdown styles
+    dropdownBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderRadius: 14,
+        borderWidth: 1,
+    },
+    dropdownBarText: {
+        fontSize: 15,
+        fontWeight: '500',
+    },
+    dropdownList: {
+        marginTop: 8,
+        borderRadius: 14,
+        borderWidth: 1,
+        overflow: 'hidden',
+    },
+    dropdownItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 13,
+    },
+    dropdownItemName: {
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    dropdownItemMg: {
+        fontSize: 13,
+        fontWeight: '500',
+        opacity: 0.7,
     },
     // Modal styles
     modalOverlay: {
