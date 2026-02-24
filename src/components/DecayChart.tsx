@@ -111,6 +111,7 @@ export const DecayChart: React.FC<DecayChartProps> = ({
     const sleepThreshold = useCaffeineStore(state => state.sleepThresholdMg);
     const bedtimeHour = useCaffeineStore(state => state.bedtimeHour);
     const theme = useCaffeineStore(state => state.theme);
+    const use24HourFormat = useCaffeineStore(state => state.use24HourFormat);
     const colors = Colors[theme];
 
     const scrollRef = useRef<ScrollView>(null);
@@ -245,7 +246,7 @@ export const DecayChart: React.FC<DecayChartProps> = ({
         });
         const alertnessPath = createSmoothPath(alertnessPathPoints, chartBottom);
 
-        // X-axis labels: every 3 hours + "Now" marker
+        // X-axis labels: every hour + "Now" marker
         const labels: { x: number; label: string; isNow?: boolean }[] = [];
 
         // Find "Now" point
@@ -259,21 +260,38 @@ export const DecayChart: React.FC<DecayChartProps> = ({
 
         labels.push({ x: nowX, label: 'Now', isNow: true });
 
-        // Time labels every 3 hours
+        // Hour labels every 1 hour with collision avoidance
+        const hourLabels: { x: number; label: string }[] = [];
         caffeinePoints.forEach((p, i) => {
             const date = new Date(p.date);
-            if (date.getMinutes() === 0 && date.getHours() % 3 === 0) {
+            if (date.getMinutes() === 0) {
                 const labelX = getX(i);
-                const tooCloseToNow = Math.abs(labelX - nowX) < 30;
+                const tooCloseToNow = Math.abs(labelX - nowX) < 25;
                 const tooCloseToEdge = labelX < PADDING.left + 15 || labelX > totalChartWidth - PADDING.right - 15;
                 if (!tooCloseToNow && !tooCloseToEdge) {
-                    labels.push({
-                        x: labelX,
-                        label: format(p.date, 'ha').toLowerCase()
-                    });
+                    const h = date.getHours();
+                    let label: string;
+                    if (use24HourFormat) {
+                        label = h.toString();
+                    } else {
+                        const h12 = h % 12 === 0 ? 12 : h % 12;
+                        const suffix = h >= 12 ? 'p' : 'a';
+                        label = `${h12}${suffix}`;
+                    }
+                    hourLabels.push({ x: labelX, label });
                 }
             }
         });
+
+        // Remove hour labels that are too close to each other (< 20px)
+        const filteredHourLabels: { x: number; label: string }[] = [];
+        for (const hl of hourLabels) {
+            const tooClose = filteredHourLabels.some(prev => Math.abs(prev.x - hl.x) < 20);
+            if (!tooClose) {
+                filteredHourLabels.push(hl);
+            }
+        }
+        filteredHourLabels.forEach(hl => labels.push(hl));
 
         // Day separator lines + labels (only for multi-day views)
         const dayMarkers: { x: number; label: string }[] = [];
@@ -332,7 +350,7 @@ export const DecayChart: React.FC<DecayChartProps> = ({
             nowCaffeineY,
             dayMarkers,
         };
-    }, [doses, getChartData, getAlertnessData, sleepThreshold, bedtimeHour, visibleDays, totalChartWidth, lookbackHours]);
+    }, [doses, getChartData, getAlertnessData, sleepThreshold, bedtimeHour, visibleDays, totalChartWidth, lookbackHours, use24HourFormat]);
 
     if (doses.length === 0 || !chartData) {
         return (
@@ -550,7 +568,7 @@ export const DecayChart: React.FC<DecayChartProps> = ({
                             fill={label.isNow ? colors.primary : colors.textSecondary}
                             fontSize={label.isNow ? 11 : 10}
                             textAnchor="middle"
-                            opacity={label.isNow ? 1 : 0.6}
+                            opacity={label.isNow ? 1 : 0.5}
                             fontWeight={label.isNow ? '700' : '400'}
                         >
                             {label.label}
