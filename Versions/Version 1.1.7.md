@@ -14,6 +14,7 @@ Enhanced the `DecayChart` with hourly X-axis labels for better readability, with
 ### X-Axis Hourly Labels on DecayChart
 - **File:** `src/components/DecayChart.tsx`
 - Changed X-axis labels from **3-hourly** to **every hour** for improved granularity
+- **Root cause fix:** Chart data points are generated at 30-min intervals from arbitrary timestamps (e.g., 9:17, 9:47), so they never land on `:00`. The old `date.getMinutes() === 0` check never matched. New approach computes hourly positions directly from the chart's time range via ratio interpolation: `(hourTimestamp - chartFirstTime) / chartTimeRange`
 - Added `use24HourFormat` support from the store:
   - **24h mode:** Shows bare hour numbers (e.g., `0`, `6`, `14`, `22`)
   - **12h mode:** Shows abbreviated format (e.g., `6a`, `2p`, `12a`)

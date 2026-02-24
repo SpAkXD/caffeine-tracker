@@ -260,28 +260,38 @@ export const DecayChart: React.FC<DecayChartProps> = ({
 
         labels.push({ x: nowX, label: 'Now', isNow: true });
 
-        // Hour labels every 1 hour with collision avoidance
+        // Hour labels — compute directly from the chart time range
+        // (data points are at 30-min intervals from arbitrary start, so they never land on :00)
+        const chartFirstTime = caffeinePoints[0].date;
+        const chartLastTime = caffeinePoints[caffeinePoints.length - 1].date;
+        const chartTimeRange = chartLastTime - chartFirstTime;
+
         const hourLabels: { x: number; label: string }[] = [];
-        caffeinePoints.forEach((p, i) => {
-            const date = new Date(p.date);
-            if (date.getMinutes() === 0) {
-                const labelX = getX(i);
-                const tooCloseToNow = Math.abs(labelX - nowX) < 25;
-                const tooCloseToEdge = labelX < PADDING.left + 15 || labelX > totalChartWidth - PADDING.right - 15;
-                if (!tooCloseToNow && !tooCloseToEdge) {
-                    const h = date.getHours();
-                    let label: string;
-                    if (use24HourFormat) {
-                        label = h.toString();
-                    } else {
-                        const h12 = h % 12 === 0 ? 12 : h % 12;
-                        const suffix = h >= 12 ? 'p' : 'a';
-                        label = `${h12}${suffix}`;
-                    }
-                    hourLabels.push({ x: labelX, label });
+        // Find the first whole hour at or after chartFirstTime
+        const firstHour = new Date(chartFirstTime);
+        firstHour.setMinutes(0, 0, 0);
+        if (firstHour.getTime() < chartFirstTime) {
+            firstHour.setHours(firstHour.getHours() + 1);
+        }
+
+        for (let t = firstHour.getTime(); t <= chartLastTime; t += 60 * 60 * 1000) {
+            const ratio = (t - chartFirstTime) / chartTimeRange;
+            const labelX = PADDING.left + ratio * innerWidth;
+            const tooCloseToNow = Math.abs(labelX - nowX) < 25;
+            const tooCloseToEdge = labelX < PADDING.left + 15 || labelX > totalChartWidth - PADDING.right - 15;
+            if (!tooCloseToNow && !tooCloseToEdge) {
+                const h = new Date(t).getHours();
+                let label: string;
+                if (use24HourFormat) {
+                    label = h.toString();
+                } else {
+                    const h12 = h % 12 === 0 ? 12 : h % 12;
+                    const suffix = h >= 12 ? 'p' : 'a';
+                    label = `${h12}${suffix}`;
                 }
+                hourLabels.push({ x: labelX, label });
             }
-        });
+        }
 
         // Remove hour labels that are too close to each other (< 20px)
         const filteredHourLabels: { x: number; label: string }[] = [];
