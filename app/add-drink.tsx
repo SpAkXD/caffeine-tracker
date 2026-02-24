@@ -1,8 +1,9 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal, Pressable, FlatList, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal, Pressable, Animated, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { DrinkPresetCard } from '../src/components/DrinkPresetCard';
 import { StyledButton } from '../src/components/StyledButton';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
@@ -21,13 +22,67 @@ interface WheelPickerProps {
     width?: number;
 }
 
+function AnimatedWheelItem({ item, index, scrollY, textColor, width }: {
+    item: string;
+    index: number;
+    scrollY: Animated.Value;
+    textColor: string;
+    width: number;
+}) {
+    const inputRange = [
+        (index - 2) * ITEM_HEIGHT,
+        (index - 1) * ITEM_HEIGHT,
+        index * ITEM_HEIGHT,
+        (index + 1) * ITEM_HEIGHT,
+        (index + 2) * ITEM_HEIGHT,
+    ];
+
+    const scale = scrollY.interpolate({
+        inputRange,
+        outputRange: [0.75, 0.85, 1.15, 0.85, 0.75],
+        extrapolate: 'clamp',
+    });
+
+    const opacity = scrollY.interpolate({
+        inputRange,
+        outputRange: [0.15, 0.3, 1, 0.3, 0.15],
+        extrapolate: 'clamp',
+    });
+
+    return (
+        <Animated.View
+            style={{
+                height: ITEM_HEIGHT,
+                width,
+                alignItems: 'center',
+                justifyContent: 'center',
+                transform: [{ scale }],
+                opacity,
+            }}
+        >
+            <Text
+                style={{
+                    color: textColor,
+                    fontSize: 20,
+                    fontWeight: '700',
+                    textAlign: 'center',
+                }}
+            >
+                {item}
+            </Text>
+        </Animated.View>
+    );
+}
+
 function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryColor, width = 60 }: WheelPickerProps) {
-    const flatListRef = useRef<FlatList>(null);
+    const flatListRef = useRef<Animated.FlatList>(null);
+    const scrollY = useRef(new Animated.Value(selectedIndex * ITEM_HEIGHT)).current;
     const isUserScrolling = useRef(false);
+    const lastSnappedIndex = useRef(selectedIndex);
 
     useEffect(() => {
         if (!isUserScrolling.current && flatListRef.current) {
-            flatListRef.current.scrollToOffset({
+            (flatListRef.current as any).scrollToOffset({
                 offset: selectedIndex * ITEM_HEIGHT,
                 animated: false,
             });
@@ -40,6 +95,10 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
             const index = Math.round(offsetY / ITEM_HEIGHT);
             const clampedIndex = Math.max(0, Math.min(index, data.length - 1));
             isUserScrolling.current = false;
+            if (clampedIndex !== lastSnappedIndex.current) {
+                lastSnappedIndex.current = clampedIndex;
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }
             onIndexChange(clampedIndex);
         },
         [data.length, onIndexChange]
@@ -49,34 +108,29 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
         isUserScrolling.current = true;
     }, []);
 
-    const renderItem = useCallback(
-        ({ item, index }: { item: string; index: number }) => {
-            const isSelected = index === selectedIndex;
+    const onScroll = Animated.event(
+        [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+        { useNativeDriver: true }
+    );
 
-            return (
-                <View style={{ height: ITEM_HEIGHT, width, alignItems: 'center', justifyContent: 'center' }}>
-                    <Text
-                        style={{
-                            color: isSelected ? textColor : secondaryColor,
-                            fontSize: isSelected ? 24 : 16,
-                            fontWeight: isSelected ? '700' : '400',
-                            opacity: isSelected ? 1 : 0.35,
-                            textAlign: 'center',
-                        }}
-                    >
-                        {item}
-                    </Text>
-                </View>
-            );
-        },
-        [selectedIndex, textColor, secondaryColor, width]
+    const renderItem = useCallback(
+        ({ item, index }: { item: string; index: number }) => (
+            <AnimatedWheelItem
+                item={item}
+                index={index}
+                scrollY={scrollY}
+                textColor={textColor}
+                width={width}
+            />
+        ),
+        [scrollY, textColor, width]
     );
 
     const keyExtractor = useCallback((_: string, i: number) => i.toString(), []);
 
     return (
-        <View style={{ height: WHEEL_HEIGHT, width, overflow: 'hidden' }} pointerEvents="auto">
-            <FlatList
+        <View style={{ height: WHEEL_HEIGHT, width, overflow: 'hidden' }}>
+            <Animated.FlatList
                 ref={flatListRef}
                 data={data}
                 keyExtractor={keyExtractor}
@@ -87,6 +141,10 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
                 keyboardShouldPersistTaps="handled"
                 snapToInterval={ITEM_HEIGHT}
                 decelerationRate="fast"
+                bounces={false}
+                overScrollMode="never"
+                onScroll={onScroll}
+                scrollEventThrottle={16}
                 onMomentumScrollEnd={handleScrollEnd}
                 onScrollEndDrag={handleScrollEnd}
                 onScrollBeginDrag={handleScrollBeginDrag}
@@ -554,7 +612,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         left: 12,
         right: 12,
-        top: ITEM_HEIGHT + 12, // paddingVertical(12) + 1 item
+        top: ITEM_HEIGHT + 12,
         height: ITEM_HEIGHT,
         borderRadius: 8,
     },

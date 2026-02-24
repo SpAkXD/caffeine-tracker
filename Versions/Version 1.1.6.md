@@ -29,6 +29,12 @@
 - **Settings UI:** New "Time Format" toggle in the Appearance card with 12-Hour / 24-Hour label
 - The wheel picker and chip display both respect the format preference
 
+### Animated Wheel Picker UI + Haptic Feedback
+- Refactored `WheelPicker` to use `Animated.FlatList` with continuous scroll-position interpolation
+- Each item smoothly animates **scale** (0.75 → 1.15 at center) and **opacity** (0.15 → 1.0) as it scrolls, creating an iOS-style 3D drum effect at 60fps via `useNativeDriver: true`
+- Added `expo-haptics` light impact trigger on snap to a new index
+- Physics tuning: `bounces={false}`, `overScrollMode="never"`, `decelerationRate="fast"`, `snapToInterval={ITEM_HEIGHT}` for tight, premium scrolling
+
 ### Other
 - Bumped version to `1.1.6`, versionCode to `9`
 - Updated settings version string to `1.1.6`
