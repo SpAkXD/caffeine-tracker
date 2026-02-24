@@ -327,7 +327,7 @@ export default function SettingsScreen() {
                     />
                 )}
 
-                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.1.6</Text>
+                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.1.7</Text>
 
                 {/* Widget Preview */}
                 {FEATURES.WIDGET_PREVIEW && (
