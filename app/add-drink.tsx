@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal, Pressable, FlatList, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, TouchableWithoutFeedback, Alert, Modal, Pressable, FlatList, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -83,6 +83,8 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
                 renderItem={renderItem}
                 showsVerticalScrollIndicator={false}
                 nestedScrollEnabled={true}
+                scrollEnabled={true}
+                keyboardShouldPersistTaps="handled"
                 snapToInterval={ITEM_HEIGHT}
                 decelerationRate="fast"
                 onMomentumScrollEnd={handleScrollEnd}
@@ -277,156 +279,155 @@ export default function AddDrinkScreen() {
                 onRequestClose={handleCancel}
             >
                 <Pressable style={styles.modalOverlay} onPress={handleCancel}>
-                    {/* Use View instead of Pressable to avoid swallowing touch events from FlatList wheels */}
-                    <View
-                        style={[styles.modalCard, {
-                            backgroundColor: theme === 'dark' ? '#1C1C1E' : '#F2F2F7',
-                        }]}
-                        onStartShouldSetResponder={() => true}
-                        onResponderRelease={() => { }}
-                    >
-                        {/* Header */}
-                        <Text style={[styles.modalTitle, { color: colors.text }]}>
-                            Add {pendingDrink?.name}?
-                        </Text>
-                        <Text style={[styles.modalSubtext, { color: colors.textSecondary }]}>
-                            Adding {pendingDrink?.mg}mg to your log.
-                        </Text>
+                    <TouchableWithoutFeedback>
+                        <View
+                            style={[styles.modalCard, {
+                                backgroundColor: theme === 'dark' ? '#1C1C1E' : '#F2F2F7',
+                            }]}
+                        >
+                            {/* Header */}
+                            <Text style={[styles.modalTitle, { color: colors.text }]}>
+                                Add {pendingDrink?.name}?
+                            </Text>
+                            <Text style={[styles.modalSubtext, { color: colors.textSecondary }]}>
+                                Adding {pendingDrink?.mg}mg to your log.
+                            </Text>
 
-                        {/* Time Selection Chips */}
-                        <Text style={[styles.modalSectionLabel, { color: colors.textSecondary }]}>
-                            When did you drink it?
-                        </Text>
-                        <View style={styles.modalTimeRow}>
-                            {/* Chip 1: Just Now */}
-                            <TouchableOpacity
-                                style={[
-                                    styles.modalTimeChip,
-                                    {
-                                        backgroundColor: !isCustomTime
-                                            ? colors.primary
-                                            : 'rgba(255,255,255,0.1)',
-                                        borderColor: !isCustomTime
-                                            ? colors.primary
-                                            : 'rgba(255,255,255,0.1)',
-                                    },
-                                ]}
-                                onPress={() => {
-                                    setIsCustomTime(false);
-                                    setSelectedDate(new Date());
-                                }}
-                            >
-                                <Text
-                                    numberOfLines={1}
+                            {/* Time Selection Chips */}
+                            <Text style={[styles.modalSectionLabel, { color: colors.textSecondary }]}>
+                                When did you drink it?
+                            </Text>
+                            <View style={styles.modalTimeRow}>
+                                {/* Chip 1: Just Now */}
+                                <TouchableOpacity
                                     style={[
-                                        styles.modalTimeText,
+                                        styles.modalTimeChip,
                                         {
-                                            color: !isCustomTime ? '#FFFFFF' : '#A1A1AA',
-                                            fontWeight: !isCustomTime ? '700' : '600',
+                                            backgroundColor: !isCustomTime
+                                                ? colors.primary
+                                                : 'rgba(255,255,255,0.1)',
+                                            borderColor: !isCustomTime
+                                                ? colors.primary
+                                                : 'rgba(255,255,255,0.1)',
                                         },
                                     ]}
+                                    onPress={() => {
+                                        setIsCustomTime(false);
+                                        setSelectedDate(new Date());
+                                    }}
                                 >
-                                    Just Now
-                                </Text>
-                            </TouchableOpacity>
+                                    <Text
+                                        numberOfLines={1}
+                                        style={[
+                                            styles.modalTimeText,
+                                            {
+                                                color: !isCustomTime ? '#FFFFFF' : '#A1A1AA',
+                                                fontWeight: !isCustomTime ? '700' : '600',
+                                            },
+                                        ]}
+                                    >
+                                        Just Now
+                                    </Text>
+                                </TouchableOpacity>
 
-                            {/* Chip 2: Custom Time */}
-                            <TouchableOpacity
-                                style={[
-                                    styles.modalTimeChip,
-                                    {
-                                        backgroundColor: isCustomTime
-                                            ? colors.primary
-                                            : 'rgba(255,255,255,0.1)',
-                                        borderColor: isCustomTime
-                                            ? colors.primary
-                                            : 'rgba(255,255,255,0.1)',
-                                    },
-                                ]}
-                                onPress={() => {
-                                    setIsCustomTime(true);
-                                }}
-                            >
-                                <Text
-                                    numberOfLines={1}
+                                {/* Chip 2: Custom Time */}
+                                <TouchableOpacity
                                     style={[
-                                        styles.modalTimeText,
+                                        styles.modalTimeChip,
                                         {
-                                            color: isCustomTime ? '#FFFFFF' : '#A1A1AA',
-                                            fontWeight: isCustomTime ? '700' : '600',
+                                            backgroundColor: isCustomTime
+                                                ? colors.primary
+                                                : 'rgba(255,255,255,0.1)',
+                                            borderColor: isCustomTime
+                                                ? colors.primary
+                                                : 'rgba(255,255,255,0.1)',
                                         },
                                     ]}
+                                    onPress={() => {
+                                        setIsCustomTime(true);
+                                    }}
                                 >
-                                    {isCustomTime ? formatTime(selectedDate) : 'Pick Time'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
+                                    <Text
+                                        numberOfLines={1}
+                                        style={[
+                                            styles.modalTimeText,
+                                            {
+                                                color: isCustomTime ? '#FFFFFF' : '#A1A1AA',
+                                                fontWeight: isCustomTime ? '700' : '600',
+                                            },
+                                        ]}
+                                    >
+                                        {isCustomTime ? formatTime(selectedDate) : 'Pick Time'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
 
-                        {/* Scroll Wheel Time Picker */}
-                        {isCustomTime && (
-                            <View
-                                style={[styles.wheelContainer, {
-                                    backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                                }]}
-                                pointerEvents="auto"
-                            >
-                                {/* Selection indicator */}
-                                <View style={[styles.wheelIndicator, {
-                                    backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                                }]} />
+                            {/* Scroll Wheel Time Picker */}
+                            {isCustomTime && (
+                                <View
+                                    style={[styles.wheelContainer, {
+                                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                                    }]}
+                                    pointerEvents="auto"
+                                >
+                                    {/* Selection indicator */}
+                                    <View style={[styles.wheelIndicator, {
+                                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                                    }]} />
 
-                                <View style={styles.wheelRow}>
-                                    <WheelPicker
-                                        data={hoursData}
-                                        selectedIndex={hourIndex}
-                                        onIndexChange={handleHourChange}
-                                        textColor={colors.text}
-                                        secondaryColor={colors.textSecondary}
-                                        width={use24HourFormat ? 60 : 50}
-                                    />
-                                    <Text style={[styles.wheelSeparator, { color: colors.text }]}>:</Text>
-                                    <WheelPicker
-                                        data={minutesData}
-                                        selectedIndex={minuteIndex}
-                                        onIndexChange={handleMinuteChange}
-                                        textColor={colors.text}
-                                        secondaryColor={colors.textSecondary}
-                                        width={60}
-                                    />
-                                    {!use24HourFormat && (
+                                    <View style={styles.wheelRow}>
                                         <WheelPicker
-                                            data={amPmData}
-                                            selectedIndex={amPmIndex}
-                                            onIndexChange={handleAmPmChange}
+                                            data={hoursData}
+                                            selectedIndex={hourIndex}
+                                            onIndexChange={handleHourChange}
                                             textColor={colors.text}
                                             secondaryColor={colors.textSecondary}
-                                            width={50}
+                                            width={use24HourFormat ? 60 : 50}
                                         />
-                                    )}
+                                        <Text style={[styles.wheelSeparator, { color: colors.text }]}>:</Text>
+                                        <WheelPicker
+                                            data={minutesData}
+                                            selectedIndex={minuteIndex}
+                                            onIndexChange={handleMinuteChange}
+                                            textColor={colors.text}
+                                            secondaryColor={colors.textSecondary}
+                                            width={60}
+                                        />
+                                        {!use24HourFormat && (
+                                            <WheelPicker
+                                                data={amPmData}
+                                                selectedIndex={amPmIndex}
+                                                onIndexChange={handleAmPmChange}
+                                                textColor={colors.text}
+                                                secondaryColor={colors.textSecondary}
+                                                width={50}
+                                            />
+                                        )}
+                                    </View>
                                 </View>
-                            </View>
-                        )}
+                            )}
 
-                        {/* Action Buttons */}
-                        <View style={styles.modalActions}>
-                            <TouchableOpacity
-                                style={[styles.modalButton, styles.cancelButton, {
-                                    backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                                }]}
-                                onPress={handleCancel}
-                            >
-                                <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.modalButton, styles.confirmButton, {
-                                    backgroundColor: colors.primary,
-                                }]}
-                                onPress={handleConfirm}
-                            >
-                                <Text style={[styles.modalButtonText, { color: '#FFFFFF', fontWeight: '800' }]}>Confirm Add</Text>
-                            </TouchableOpacity>
+                            {/* Action Buttons */}
+                            <View style={styles.modalActions}>
+                                <TouchableOpacity
+                                    style={[styles.modalButton, styles.cancelButton, {
+                                        backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                                    }]}
+                                    onPress={handleCancel}
+                                >
+                                    <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.modalButton, styles.confirmButton, {
+                                        backgroundColor: colors.primary,
+                                    }]}
+                                    onPress={handleConfirm}
+                                >
+                                    <Text style={[styles.modalButtonText, { color: '#FFFFFF', fontWeight: '800' }]}>Confirm Add</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    </View>
+                    </TouchableWithoutFeedback>
                 </Pressable>
             </Modal>
         </View>

@@ -20,7 +20,7 @@
 
 ### Wheel Picker Fixes (post-initial commit)
 - **Alignment fix:** `ITEM_HEIGHT` set to 45px, `contentContainerStyle={{ paddingVertical: ITEM_HEIGHT }}` so first/last items scroll to exact center
-- **Touch fix:** Added `nestedScrollEnabled={true}` to every FlatList, changed inner modal `Pressable` to `View` with `onStartShouldSetResponder` to stop swallowing FlatList scroll gestures, added `pointerEvents="auto"` to wheel container
+- **Touch fix:** Wrapped inner modal content in `TouchableWithoutFeedback` (no `onPress`) to block overlay dismiss without swallowing FlatList scroll gestures. Removed `onStartShouldSetResponder`/`onResponderRelease` which were still acting as a gesture responder. Added `scrollEnabled={true}`, `keyboardShouldPersistTaps="handled"`, and `nestedScrollEnabled={true}` to all FlatLists. Added `pointerEvents="auto"` to wheel container
 - **State sync fix:** Split into `handleHourChange`, `handleMinuteChange`, `handleAmPmChange` callbacks that each create a new `Date` from `selectedDate`, apply the change, cap at `new Date()`, and call `setSelectedDate` — the "Custom Time" chip now updates live as wheels scroll
 
 ### Global Time Format Preference
