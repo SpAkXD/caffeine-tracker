@@ -80,9 +80,6 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
     const isUserScrolling = useRef(false);
     const lastSnappedIndex = useRef(selectedIndex);
 
-    // Generate exact snap offsets for every item
-    const snapOffsets = data.map((_, i) => i * ITEM_HEIGHT);
-
     useEffect(() => {
         if (!isUserScrolling.current && flatListRef.current) {
             (flatListRef.current as any).scrollToOffset({
@@ -97,16 +94,6 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
             const offsetY = event.nativeEvent.contentOffset.y;
             const index = Math.round(offsetY / ITEM_HEIGHT);
             const clampedIndex = Math.max(0, Math.min(index, data.length - 1));
-            const targetOffset = clampedIndex * ITEM_HEIGHT;
-
-            // Force-correct to exact offset if not perfectly aligned
-            if (Math.abs(offsetY - targetOffset) > 1 && flatListRef.current) {
-                (flatListRef.current as any).scrollToOffset({
-                    offset: targetOffset,
-                    animated: true,
-                });
-            }
-
             isUserScrolling.current = false;
             if (clampedIndex !== lastSnappedIndex.current) {
                 lastSnappedIndex.current = clampedIndex;
@@ -152,8 +139,7 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
                 nestedScrollEnabled={true}
                 scrollEnabled={true}
                 keyboardShouldPersistTaps="handled"
-                snapToOffsets={snapOffsets}
-                snapToAlignment="center"
+                snapToInterval={ITEM_HEIGHT}
                 decelerationRate="fast"
                 bounces={false}
                 overScrollMode="never"

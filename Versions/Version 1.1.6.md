@@ -33,12 +33,14 @@
 - Refactored `WheelPicker` to use `Animated.FlatList` with continuous scroll-position interpolation
 - Each item smoothly animates **scale** (0.75 → 1.15 at center) and **opacity** (0.15 → 1.0) as it scrolls, creating an iOS-style 3D drum effect at 60fps via `useNativeDriver: true`
 - Added `expo-haptics` light impact trigger on snap to a new index
-- Physics tuning: `bounces={false}`, `overScrollMode="never"`, `decelerationRate="fast"`, `snapToOffsets` array for tight, premium scrolling
+- Physics tuning: `bounces={false}`, `overScrollMode="never"`, `decelerationRate="fast"`, `snapToInterval={ITEM_HEIGHT}` for tight, premium scrolling
 
-### Wheel Picker Snap Physics Fix
-- Replaced `snapToInterval` with `snapToOffsets` (exact per-item offset array) + `snapToAlignment="center"` for guaranteed snap
-- Added force-correction in `handleScrollEnd`: if final offset is >1px from the nearest item, `scrollToOffset` with `animated: true` forces exact alignment
-- Ensures no matter how fast the user flicks, the wheel always settles exactly on an item
+### Wheel Picker Scroll Physics Audit
+- **Root cause:** `snapToOffsets` + `snapToAlignment="center"` conflicted with `contentContainerStyle={{ paddingVertical: ITEM_HEIGHT }}` — the offsets didn't account for the padding, causing misalignment, rubber-banding, and skipping
+- **Fix:** Reverted to `snapToInterval={ITEM_HEIGHT}` which works correctly with paddingVertical
+- Removed force-correction `scrollToOffset` in `handleScrollEnd` which triggered secondary scroll animations causing jerky rubber-band effect
+- `getItemLayout` verified correct: `length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index`
+- State updates confirmed only at scroll end (`onMomentumScrollEnd` + `onScrollEndDrag`), never mid-scroll
 
 ### Modal Button Contrast Fix
 - Active time chip text changed from `#FFFFFF` to `#1C1C1E` (dark on primary) with `fontWeight: '800'`
