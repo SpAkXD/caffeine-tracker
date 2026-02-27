@@ -34,3 +34,11 @@ Enables all premium "Pro" feature flags and adds a Developer Pro Mode debug togg
 
 ### Version Bump
 - **File:** `app.config.ts` — version `"1.1.7"` → `"2.0.0"`
+
+### Dev Mode Notification Tester
+- **File:** `src/services/notificationService.ts`
+  - Added `scheduleTestNotification(currentLevel: number)` — schedules a notification with a 5-second `TIME_INTERVAL` trigger, using the exact same payload as the background task (`☕ Caffeine Update` / `Current Level: X mg`)
+- **File:** `app/settings.tsx`
+  - Imported `scheduleTestNotification` from the notification service
+  - Added a "DEV: Send Test Notification (5s)" button below the "DEV: Toggle Pro Mode" button, conditionally rendered when `isProDebug` is `true`
+  - On press, grabs the current caffeine level from the store, schedules the notification, and shows a confirmation `Alert`

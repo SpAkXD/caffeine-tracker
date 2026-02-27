@@ -116,6 +116,34 @@ export async function sendTestNotification(caffeineLevel: number): Promise<void>
 }
 
 /**
+ * Schedule a test notification with a 5-second delay.
+ * Mirrors the exact payload the background task sends,
+ * so devs can verify notification UI without waiting hours.
+ * @param currentLevel - Current caffeine level in mg
+ */
+export async function scheduleTestNotification(currentLevel: number): Promise<void> {
+    try {
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: '☕ Caffeine Update',
+                body: `Current Level: ${Math.round(currentLevel)} mg`,
+                data: { type: 'caffeine-update' },
+                sound: false,
+            },
+            trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                seconds: 5,
+                repeats: false,
+            },
+        });
+        console.log('Test notification scheduled (5 seconds)');
+    } catch (error) {
+        console.error('Error scheduling test notification:', error);
+        throw error;
+    }
+}
+
+/**
  * Get the current notification permission status
  */
 export async function getNotificationPermissionStatus(): Promise<'granted' | 'denied' | 'undetermined'> {

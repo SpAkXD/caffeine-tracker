@@ -9,6 +9,7 @@ import { Colors } from '../src/constants/Colors';
 import {
     requestNotificationPermissions,
     cancelAllNotifications,
+    scheduleTestNotification,
 } from '../src/services/notificationService';
 import {
     registerBackgroundTask,
@@ -365,6 +366,20 @@ export default function SettingsScreen() {
                         DEV: Toggle Pro Mode {isProDebug ? '(ON)' : '(OFF)'}
                     </Text>
                 </TouchableOpacity>
+
+                {/* DEV: Send Test Notification (5s) */}
+                {isProDebug && (
+                    <StyledButton
+                        title="DEV: Send Test Notification (5s)"
+                        variant="secondary"
+                        onPress={() => {
+                            const level = getCurrentLevel();
+                            scheduleTestNotification(level);
+                            Alert.alert('Sent', 'Close the app now. Notification arriving in 5 seconds.');
+                        }}
+                        style={{ marginTop: 12, marginBottom: 20 }}
+                    />
+                )}
 
             </ScrollView>
 
