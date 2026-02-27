@@ -20,6 +20,7 @@ import { FEATURES } from '../src/config/featureFlags';
 export default function Dashboard() {
     const router = useRouter();
     const theme = useCaffeineStore(state => state.theme);
+    const isProDebug = useCaffeineStore(state => state.isProDebug);
     const colors = Colors[theme];
     const insets = useSafeAreaInsets();
 
@@ -75,7 +76,7 @@ export default function Dashboard() {
                         </GlassmorphicCard>
                     )}
 
-                    {FEATURES.DETAILED_STATS && (
+                    {(FEATURES.DETAILED_STATS || isProDebug) && (
                         <TouchableOpacity
                             style={[styles.detailsButton, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: colors.border }]}
                             onPress={() => router.push('./detailed-stats' as any)}

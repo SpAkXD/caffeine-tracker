@@ -32,7 +32,7 @@ module.exports = {
         HISTORY_CARD: true,
 
         /** "Detailed Statistics" button → opens detailed-stats page */
-        DETAILED_STATS: false,
+        DETAILED_STATS: true,
 
         // ── Add Drink Screen ──────────────────────────────────────────────
         /** The entire add-drink modal with preset cards + custom dose */
@@ -43,7 +43,7 @@ module.exports = {
         THEME_TOGGLE: true,
 
         /** Push notification toggle + frequency selector */
-        NOTIFICATIONS: false,
+        NOTIFICATIONS: true,
 
         /** Body weight slider (adjusts effective half-life) */
         WEIGHT_SETTING: true,
@@ -55,7 +55,7 @@ module.exports = {
         THRESHOLD_SETTING: true,
 
         /** In-app widget preview card in settings */
-        WIDGET_PREVIEW: false,
+        WIDGET_PREVIEW: true,
 
         /** "Reset All Data" button */
         CLEAR_DATA: true,
@@ -65,13 +65,13 @@ module.exports = {
 
         // ── Home Screen Widget ────────────────────────────────────────────
         /** Real Android home screen widget (GoodEnergy) */
-        HOME_WIDGET: false,
+        HOME_WIDGET: true,
 
         // ── Background Services ───────────────────────────────────────────
         /** Periodic background caffeine level notifications */
-        BACKGROUND_NOTIFICATIONS: false,
+        BACKGROUND_NOTIFICATIONS: true,
 
         /** Background widget refresh (tied to background fetch task) */
-        BACKGROUND_WIDGET_REFRESH: false,
+        BACKGROUND_WIDGET_REFRESH: true,
     }
 };

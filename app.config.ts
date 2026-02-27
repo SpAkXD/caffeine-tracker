@@ -38,7 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         ...config,
         name: "Caffeine Tracker",
         slug: "caffeine-tracker",
-        version: "1.1.7",
+        version: "2.0.0",
         orientation: "portrait",
         icon: "./assets/images/icon.png",
         scheme: "caffinetracker",

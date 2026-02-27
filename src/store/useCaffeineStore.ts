@@ -22,6 +22,7 @@ interface CaffeineState {
     sleepQuality: 'great' | 'average' | 'poor';
     bedtimeHour: number; // 0-23, default 22 (10 PM)
     use24HourFormat: boolean; // 12h vs 24h time display
+    isProDebug: boolean; // Dev toggle to simulate Pro mode
 
     // === SINGLE SOURCE OF TRUTH ===
     // These are computed once and shared across all components.
@@ -42,6 +43,7 @@ interface CaffeineState {
     clearDoses: () => void;
     cleanupOldDoses: () => void;
     refreshCurrentLevel: () => void; // Recalculate currentLevel + clearanceTime from Date.now()
+    toggleProDebug: () => void;
 
     // Selectors (still available for backward compat)
     getCurrentLevel: () => number;
@@ -79,6 +81,7 @@ export const useCaffeineStore = create<CaffeineState>()(
             sleepQuality: 'great',
             bedtimeHour: 22,
             use24HourFormat: false,
+            isProDebug: false,
 
             // === Single Source of Truth state ===
             currentLevel: 0,
@@ -155,6 +158,12 @@ export const useCaffeineStore = create<CaffeineState>()(
                 const cutoff = Date.now() - THREE_DAYS_MS;
                 set((state) => ({
                     doses: state.doses.filter((d) => d.timestamp >= cutoff),
+                }));
+            },
+
+            toggleProDebug: () => {
+                set((state) => ({
+                    isProDebug: !state.isProDebug,
                 }));
             },
 

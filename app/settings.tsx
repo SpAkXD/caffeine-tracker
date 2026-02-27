@@ -35,6 +35,8 @@ export default function SettingsScreen() {
     const notificationFrequency = useCaffeineStore(state => state.notificationFrequency);
     const setNotificationFrequency = useCaffeineStore(state => state.setNotificationFrequency);
     const getCurrentLevel = useCaffeineStore(state => state.getCurrentLevel);
+    const isProDebug = useCaffeineStore(state => state.isProDebug);
+    const toggleProDebug = useCaffeineStore(state => state.toggleProDebug);
 
     const colors = Colors[theme];
 
@@ -162,7 +164,7 @@ export default function SettingsScreen() {
                     </GlassmorphicCard>
                 )}
 
-                {FEATURES.NOTIFICATIONS && (
+                {(FEATURES.NOTIFICATIONS || isProDebug) && (
                     <GlassmorphicCard style={styles.card}>
                         <View style={styles.row}>
                             <Text style={[styles.label, { color: colors.primary }]}>Notifications</Text>
@@ -327,14 +329,42 @@ export default function SettingsScreen() {
                     />
                 )}
 
-                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.1.7</Text>
+                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 2.0.0</Text>
 
                 {/* Widget Preview */}
-                {FEATURES.WIDGET_PREVIEW && (
+                {(FEATURES.WIDGET_PREVIEW || isProDebug) && (
                     <GlassmorphicCard style={{ ...styles.card, marginTop: 20 }}>
                         <WidgetPreview />
                     </GlassmorphicCard>
                 )}
+
+                {/* DEV: Toggle Pro Mode */}
+                <TouchableOpacity
+                    onPress={toggleProDebug}
+                    style={[
+                        styles.devToggle,
+                        {
+                            backgroundColor: isProDebug
+                                ? 'rgba(255, 149, 0, 0.15)'
+                                : theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                            borderColor: isProDebug ? '#FF9500' : colors.border,
+                        },
+                    ]}
+                >
+                    <Ionicons
+                        name={isProDebug ? 'flash' : 'flash-outline'}
+                        size={18}
+                        color={isProDebug ? '#FF9500' : colors.textSecondary}
+                    />
+                    <Text
+                        style={[
+                            styles.devToggleText,
+                            { color: isProDebug ? '#FF9500' : colors.textSecondary },
+                        ]}
+                    >
+                        DEV: Toggle Pro Mode {isProDebug ? '(ON)' : '(OFF)'}
+                    </Text>
+                </TouchableOpacity>
 
             </ScrollView>
 
@@ -448,5 +478,21 @@ const styles = StyleSheet.create({
     frequencyText: {
         fontWeight: '600',
         fontSize: 15,
+    },
+    devToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 30,
+        marginBottom: 20,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderRadius: 14,
+        borderWidth: 1,
+        gap: 8,
+    },
+    devToggleText: {
+        fontSize: 14,
+        fontWeight: '700',
     },
 });
