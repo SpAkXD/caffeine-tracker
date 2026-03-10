@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { calculateStackedCaffeine, Dose } from '../utils/math';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -45,38 +46,56 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 /**
- * Schedule repeating notifications to show current caffeine level
- * @param getCurrentLevel - Function that returns current caffeine level in mg
+ * Pre-schedule up to 24 hourly caffeine update notifications.
+ *
+ * Instead of relying on BackgroundFetch (which the OS kills after 2-3 hours),
+ * we calculate the projected caffeine decay for the next 24 hours and schedule
+ * each notification with an exact future Date trigger. This ensures delivery
+ * regardless of OS background limits.
+ *
+ * Call this whenever the user opens the app or adds a drink — it cancels
+ * all existing scheduled notifications first, then regenerates a fresh batch.
+ *
+ * @param doses       Current dose array from the store
+ * @param halfLife    Effective half-life in hours
  */
-export async function schedulePeriodicNotifications(
-    getCurrentLevel: () => number
+export async function scheduleCaffeineUpdates(
+    doses: Dose[],
+    halfLife: number
 ): Promise<void> {
     try {
-        // Cancel any existing notifications first
-        await cancelAllNotifications();
+        // Cancel all existing scheduled notifications before regenerating
+        await Notifications.cancelAllScheduledNotificationsAsync();
 
-        // Get initial caffeine level
-        const currentLevel = getCurrentLevel();
+        const now = Date.now();
 
-        // Schedule notification to repeat every hour
-        await Notifications.scheduleNotificationAsync({
-            content: {
-                title: '☕ Current Caffeine Level',
-                body: `${Math.round(currentLevel)} mg in your system`,
-                data: { type: 'caffeine-update' },
-                sound: false,
-            },
-            trigger: {
-                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-                seconds: 3600, // 1 hour in seconds
-                repeats: true,
-                channelId: Platform.OS === 'android' ? 'caffeine-updates' : undefined,
-            },
-        });
+        for (let h = 1; h <= 24; h++) {
+            const futureTime = now + h * 60 * 60 * 1000;
+            const projectedLevel = Math.round(
+                calculateStackedCaffeine(doses, futureTime, halfLife)
+            );
 
-        console.log('Scheduled periodic caffeine notifications (hourly)');
+            // Skip if caffeine will be negligible
+            if (projectedLevel < 1) continue;
+
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: '☕ Caffeine Update',
+                    body: `Current Level: ${projectedLevel} mg`,
+                    data: { type: 'caffeine-update' },
+                    sound: false,
+                },
+                trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DATE,
+                    date: new Date(futureTime),
+                    channelId: Platform.OS === 'android' ? 'caffeine-updates' : undefined,
+                },
+            });
+        }
+
+        console.log('Pre-scheduled caffeine notifications (up to 24h)');
     } catch (error) {
-        console.error('Error scheduling notifications:', error);
+        console.error('Error scheduling caffeine updates:', error);
         throw error;
     }
 }

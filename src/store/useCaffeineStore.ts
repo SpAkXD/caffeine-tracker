@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { calculateStackedCaffeine, calculateAlertness, calculateClearanceTime, Dose } from '../utils/math';
 import { addHours, subHours, subDays, startOfDay, format, isSameDay } from 'date-fns';
 import { refreshWidget } from '../widget/refreshWidget';
+import { scheduleCaffeineUpdates } from '../services/notificationService';
 
 interface DailyStats {
     date: string; // 'YYYY-MM-DD'
@@ -100,6 +101,12 @@ export const useCaffeineStore = create<CaffeineState>()(
                 get().refreshCurrentLevel();
                 // Update home screen widget immediately
                 refreshWidget().catch(() => { });
+                // Re-schedule notification batch with updated projections
+                if (get().notificationsEnabled) {
+                    const { doses } = get();
+                    const hl = get().getEffectiveHalfLife();
+                    scheduleCaffeineUpdates(doses, hl).catch(() => { });
+                }
             },
 
             removeDose: (id) => {

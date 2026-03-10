@@ -71,6 +71,16 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
             );
             break;
         }
+        case 'WIDGET_CLICK': {
+            // Manual refresh button tapped — re-fetch and re-render
+            if (props.clickAction === 'REFRESH_WIDGET') {
+                const { currentLevel, crashTime } = await getWidgetData();
+                props.renderWidget(
+                    <GoodEnergyWidget currentLevel={currentLevel} crashTime={crashTime} />
+                );
+            }
+            break;
+        }
         case 'WIDGET_DELETED':
             // Nothing to clean up
             break;

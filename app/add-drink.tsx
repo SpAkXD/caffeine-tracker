@@ -151,7 +151,7 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
                 contentContainerStyle={{ paddingVertical: ITEM_HEIGHT }}
                 getItemLayout={(_, index) => ({
                     length: ITEM_HEIGHT,
-                    offset: ITEM_HEIGHT * index,
+                    offset: ITEM_HEIGHT * index + ITEM_HEIGHT,
                     index,
                 })}
             />

@@ -32,7 +32,7 @@ module.exports = {
         HISTORY_CARD: true,
 
         /** "Detailed Statistics" button → opens detailed-stats page */
-        DETAILED_STATS: true,
+        DETAILED_STATS: false,
 
         // ── Add Drink Screen ──────────────────────────────────────────────
         /** The entire add-drink modal with preset cards + custom dose */
@@ -43,7 +43,7 @@ module.exports = {
         THEME_TOGGLE: true,
 
         /** Push notification toggle + frequency selector */
-        NOTIFICATIONS: true,
+        NOTIFICATIONS: false,
 
         /** Body weight slider (adjusts effective half-life) */
         WEIGHT_SETTING: true,
@@ -55,7 +55,7 @@ module.exports = {
         THRESHOLD_SETTING: true,
 
         /** In-app widget preview card in settings */
-        WIDGET_PREVIEW: true,
+        WIDGET_PREVIEW: false,
 
         /** "Reset All Data" button */
         CLEAR_DATA: true,

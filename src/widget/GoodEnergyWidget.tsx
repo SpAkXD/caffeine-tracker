@@ -67,16 +67,43 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                 />
             </FlexWidget>
 
-            {/* Bottom: Crash time */}
-            <TextWidget
-                text={crashTime}
+            {/* Bottom row: Crash time + Refresh button */}
+            <FlexWidget
                 style={{
-                    fontSize: 10,
-                    color: '#FFFFFF66',
-                    fontFamily: 'monospace',
-                    letterSpacing: 1,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    width: 'match_parent',
                 }}
-            />
+            >
+                <TextWidget
+                    text={crashTime}
+                    style={{
+                        fontSize: 10,
+                        color: '#FFFFFF66',
+                        fontFamily: 'monospace',
+                        letterSpacing: 1,
+                    }}
+                />
+                {/* Manual refresh button */}
+                <FlexWidget
+                    style={{
+                        padding: 4,
+                        borderRadius: 8,
+                        backgroundColor: '#FFFFFF0D',
+                    }}
+                    clickAction="REFRESH_WIDGET"
+                    clickActionData={{ action: 'REFRESH_WIDGET' }}
+                >
+                    <TextWidget
+                        text="⟳"
+                        style={{
+                            fontSize: 14,
+                            color: '#FFFFFF66',
+                        }}
+                    />
+                </FlexWidget>
+            </FlexWidget>
         </FlexWidget>
     );
 }

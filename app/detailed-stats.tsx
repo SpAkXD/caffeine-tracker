@@ -69,12 +69,23 @@ export default function DetailedStatsScreen() {
     const storeClearanceTime = useCaffeineStore(state => state.clearanceTime);
     const qualityMultiplier = sleepQuality === 'great' ? 1.0 : sleepQuality === 'average' ? 0.8 : 0.6;
 
-    // --- Chart Data: 12-hour forecast with 1-hour labels ---
+    // --- Chart Data: 12-hour forecast with dynamic lookback ---
     const chartData = useMemo(() => {
-        const startTime = now - 2 * 60 * 60 * 1000; // 2h ago
+        // Dynamic start: cover oldest dose from today or default to 2h ago
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+        const todayDoses = doses.filter(d => d.timestamp >= todayStart.getTime());
+        const defaultStart = now - 2 * 60 * 60 * 1000; // 2h ago
+        let startTime = defaultStart;
+        if (todayDoses.length > 0) {
+            const oldestDoseTime = Math.min(...todayDoses.map(d => d.timestamp));
+            startTime = Math.min(defaultStart, oldestDoseTime - 1 * 60 * 60 * 1000);
+        }
         const endTime = now + 12 * 60 * 60 * 1000;  // 12h future
-        const totalPoints = 84; // every 10 min for 14h
-        const step = (endTime - startTime) / totalPoints;
+        // Scale points dynamically: ~10 min per point
+        const totalDuration = endTime - startTime;
+        const totalPoints = Math.max(84, Math.round(totalDuration / (10 * 60 * 1000)));
+        const step = totalDuration / totalPoints;
 
         const points: { t: number; level: number; x: number }[] = [];
         let maxLevel = 0;

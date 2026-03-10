@@ -9,12 +9,9 @@ import { Colors } from '../src/constants/Colors';
 import {
     requestNotificationPermissions,
     cancelAllNotifications,
+    scheduleCaffeineUpdates,
     scheduleTestNotification,
 } from '../src/services/notificationService';
-import {
-    registerBackgroundTask,
-    unregisterBackgroundTask,
-} from '../src/services/backgroundTask';
 import { WidgetPreview } from '../src/components/WidgetPreview';
 
 import { FEATURES } from '../src/config/featureFlags';
@@ -87,8 +84,11 @@ export default function SettingsScreen() {
             const granted = await requestNotificationPermissions();
             if (granted) {
                 toggleNotifications();
-                await registerBackgroundTask(notificationFrequency);
-                Alert.alert('Notifications Enabled', `You'll receive caffeine updates every ${notificationFrequency}h`);
+                // Pre-schedule 24h of notification updates
+                const doses = useCaffeineStore.getState().doses;
+                const hl = useCaffeineStore.getState().getEffectiveHalfLife();
+                await scheduleCaffeineUpdates(doses, hl);
+                Alert.alert('Notifications Enabled', 'You\'ll receive hourly caffeine updates');
             } else {
                 Alert.alert(
                     'Permission Required',
@@ -102,7 +102,6 @@ export default function SettingsScreen() {
         } else {
             // Turning OFF notifications
             await cancelAllNotifications();
-            await unregisterBackgroundTask();
             toggleNotifications();
         }
     };
@@ -110,7 +109,9 @@ export default function SettingsScreen() {
     const handleFrequencyChange = async (freq: 1 | 3 | 6) => {
         setNotificationFrequency(freq);
         if (notificationsEnabled) {
-            await registerBackgroundTask(freq);
+            const doses = useCaffeineStore.getState().doses;
+            const hl = useCaffeineStore.getState().getEffectiveHalfLife();
+            await scheduleCaffeineUpdates(doses, hl);
         }
     };
 
@@ -330,7 +331,7 @@ export default function SettingsScreen() {
                     />
                 )}
 
-                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 2.0.0</Text>
+                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 2.0.1</Text>
 
                 {/* Widget Preview */}
                 {(FEATURES.WIDGET_PREVIEW || isProDebug) && (

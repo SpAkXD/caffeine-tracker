@@ -133,7 +133,22 @@ export const DecayChart: React.FC<DecayChartProps> = ({
     }, [doses]);
 
     const totalChartWidth = CHART_WIDTH_PER_DAY * visibleDays;
-    const lookbackHours = visibleDays === 1 ? 2 : visibleDays === 2 ? 26 : 50;
+
+    // Dynamic lookback: for single-day view, check if any doses are older than 2h
+    const lookbackHours = useMemo(() => {
+        if (visibleDays === 2) return 26;
+        if (visibleDays === 3) return 50;
+        // Single day: find oldest dose from today
+        const now = Date.now();
+        const todayStart = startOfDay(new Date(now)).getTime();
+        const todayDoses = doses.filter(d => d.timestamp >= todayStart);
+        if (todayDoses.length > 0) {
+            const oldestDoseTime = Math.min(...todayDoses.map(d => d.timestamp));
+            const hoursToOldest = (now - oldestDoseTime) / (1000 * 60 * 60);
+            return Math.max(2, Math.ceil(hoursToOldest) + 1);
+        }
+        return 2;
+    }, [visibleDays, doses]);
 
     // Scroll to "today" (far right) on mount
     useEffect(() => {
