@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { calculateStackedCaffeine, Dose } from '../utils/math';
+import { useCaffeineStore } from '../store/useCaffeineStore';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -67,9 +68,10 @@ export async function scheduleCaffeineUpdates(
         // Cancel all existing scheduled notifications before regenerating
         await Notifications.cancelAllScheduledNotificationsAsync();
 
+        const frequency = useCaffeineStore.getState().notificationFrequency || 1;
         const now = Date.now();
 
-        for (let h = 1; h <= 24; h++) {
+        for (let h = frequency; h <= 24; h += frequency) {
             const futureTime = now + h * 60 * 60 * 1000;
             const projectedLevel = Math.round(
                 calculateStackedCaffeine(doses, futureTime, halfLife)

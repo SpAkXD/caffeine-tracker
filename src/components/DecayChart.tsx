@@ -1,5 +1,5 @@
-import React, { useMemo, useRef, useEffect } from 'react';
-import { View, StyleSheet, Dimensions, Text, ScrollView } from 'react-native';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
+import { View, StyleSheet, Dimensions, Text, ScrollView, AppState } from 'react-native';
 import Svg, { Path, Line, Text as SvgText, Defs, LinearGradient, Stop, Rect, Circle } from 'react-native-svg';
 import { useCaffeineStore } from '../store/useCaffeineStore';
 import { format, subDays, startOfDay } from 'date-fns';
@@ -115,10 +115,21 @@ export const DecayChart: React.FC<DecayChartProps> = ({
     const colors = Colors[theme];
 
     const scrollRef = useRef<ScrollView>(null);
+    const [currentTime, setCurrentTime] = useState(Date.now());
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            if (nextAppState === 'active') {
+                setCurrentTime(Date.now());
+            }
+        });
+
+        return () => subscription.remove();
+    }, []);
 
     // --- Determine how many past days have data ---
     const visibleDays = useMemo(() => {
-        const now = new Date();
+        const now = new Date(currentTime);
         const yesterdayStart = startOfDay(subDays(now, 1)).getTime();
         const yesterdayEnd = startOfDay(now).getTime();
         const dayBeforeStart = startOfDay(subDays(now, 2)).getTime();
@@ -130,7 +141,7 @@ export const DecayChart: React.FC<DecayChartProps> = ({
         if (hasDayBefore && hasYesterday) return 3;
         if (hasYesterday) return 2;
         return 1;
-    }, [doses]);
+    }, [doses, currentTime]);
 
     const totalChartWidth = CHART_WIDTH_PER_DAY * visibleDays;
 
@@ -139,7 +150,7 @@ export const DecayChart: React.FC<DecayChartProps> = ({
         if (visibleDays === 2) return 26;
         if (visibleDays === 3) return 50;
         // Single day: find oldest dose from today
-        const now = Date.now();
+        const now = currentTime;
         const todayStart = startOfDay(new Date(now)).getTime();
         const todayDoses = doses.filter(d => d.timestamp >= todayStart);
         if (todayDoses.length > 0) {
@@ -148,7 +159,7 @@ export const DecayChart: React.FC<DecayChartProps> = ({
             return Math.max(2, Math.ceil(hoursToOldest) + 1);
         }
         return 2;
-    }, [visibleDays, doses]);
+    }, [visibleDays, doses, currentTime]);
 
     // Scroll to "today" (far right) on mount
     useEffect(() => {
@@ -181,7 +192,7 @@ export const DecayChart: React.FC<DecayChartProps> = ({
         const getAlertnessY = (value: number) => PADDING.top + innerHeight - (value / maxAlertness) * innerHeight;
 
         // === SLEEP ZONE DETECTION ===
-        const now = Date.now();
+        const now = currentTime;
         const today = new Date(now);
         today.setHours(bedtimeHour, 0, 0, 0);
         let bedtime = today.getTime();
@@ -375,7 +386,7 @@ export const DecayChart: React.FC<DecayChartProps> = ({
             nowCaffeineY,
             dayMarkers,
         };
-    }, [doses, getChartData, getAlertnessData, sleepThreshold, bedtimeHour, visibleDays, totalChartWidth, lookbackHours, use24HourFormat]);
+    }, [doses, getChartData, getAlertnessData, sleepThreshold, bedtimeHour, visibleDays, totalChartWidth, lookbackHours, use24HourFormat, currentTime]);
 
     if (doses.length === 0 || !chartData) {
         return (
@@ -393,7 +404,7 @@ export const DecayChart: React.FC<DecayChartProps> = ({
         <View style={styles.container}>
             <View style={styles.timeHeader}>
                 <Text style={[styles.timeHeaderText, { color: colors.textSecondary }]}>
-                    {format(new Date(), 'MMM d')} • Now: {format(new Date(), 'h:mm a')}
+                    {format(new Date(currentTime), 'MMM d')} • Now: {format(new Date(currentTime), 'h:mm a')}
                 </Text>
                 {scrollEnabled && (
                     <Text style={[styles.scrollHint, { color: colors.textSecondary }]}>

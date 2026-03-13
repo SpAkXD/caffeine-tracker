@@ -26,7 +26,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
                         "minHeight": "110dp",
                         "description": "Shows your current caffeine level",
                         "previewImage": "./assets/images/icon.png",
-                        "updatePeriodMillis": 1800000,
+                        "updatePeriodMillis": 900000,
                         "resizeMode": "horizontal|vertical"
                     }
                 ]
@@ -38,7 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         ...config,
         name: "Caffeine Tracker",
         slug: "caffeine-tracker",
-        version: "2.0.1",
+        version: "2.0.2",
         orientation: "portrait",
         icon: "./assets/images/icon.png",
         scheme: "caffinetracker",

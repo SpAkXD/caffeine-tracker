@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, AppState } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +28,16 @@ export default function Dashboard() {
     const [showCaffeine, setShowCaffeine] = useState(true);
     const [showAlertness, setShowAlertness] = useState(true);
     const [showThreshold, setShowThreshold] = useState(false);
+    const [currentTime, setCurrentTime] = useState(Date.now());
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            if (nextAppState === 'active') {
+                setCurrentTime(Date.now());
+            }
+        });
+        return () => subscription.remove();
+    }, []);
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -39,7 +49,7 @@ export default function Dashboard() {
                 <View style={styles.header}>
                     <View>
                         <Text style={[styles.greeting, { color: colors.text }]}>Good Energy</Text>
-                        <Text style={[styles.date, { color: colors.textSecondary }]}>{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</Text>
+                        <Text style={[styles.date, { color: colors.textSecondary }]}>{new Date(currentTime).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</Text>
                     </View>
                     <TouchableOpacity onPress={() => router.push('/settings')} style={[styles.settingsButton, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
                         <Ionicons name="settings-outline" size={24} color={colors.text} />

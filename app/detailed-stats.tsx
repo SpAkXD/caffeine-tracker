@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -61,8 +61,19 @@ export default function DetailedStatsScreen() {
     const sleepQuality = useCaffeineStore(state => state.sleepQuality);
     const getEffectiveHalfLife = useCaffeineStore(state => state.getEffectiveHalfLife);
 
+    const [currentTime, setCurrentTime] = useState(Date.now());
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            if (nextAppState === 'active') {
+                setCurrentTime(Date.now());
+            }
+        });
+        return () => subscription.remove();
+    }, []);
+
     const effectiveHalfLife = getEffectiveHalfLife();
-    const now = Date.now();
+    const now = currentTime;
 
     // Current caffeine level - from store's single source of truth
     const currentLevel = useCaffeineStore(state => state.currentLevel);

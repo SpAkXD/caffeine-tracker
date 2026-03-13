@@ -88,9 +88,12 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                 {/* Manual refresh button */}
                 <FlexWidget
                     style={{
-                        padding: 4,
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
                         borderRadius: 8,
-                        backgroundColor: '#FFFFFF0D',
+                        backgroundColor: '#FFFFFF1A',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                     }}
                     clickAction="REFRESH_WIDGET"
                     clickActionData={{ action: 'REFRESH_WIDGET' }}
