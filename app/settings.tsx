@@ -87,7 +87,7 @@ export default function SettingsScreen() {
                 // Pre-schedule 24h of notification updates
                 const doses = useCaffeineStore.getState().doses;
                 const hl = useCaffeineStore.getState().getEffectiveHalfLife();
-                await scheduleCaffeineUpdates(doses, hl);
+                await scheduleCaffeineUpdates(doses, hl, notificationFrequency);
                 Alert.alert('Notifications Enabled', `You'll receive caffeine updates every ${notificationFrequency}h`);
             } else {
                 Alert.alert(
@@ -111,7 +111,7 @@ export default function SettingsScreen() {
         if (notificationsEnabled) {
             const doses = useCaffeineStore.getState().doses;
             const hl = useCaffeineStore.getState().getEffectiveHalfLife();
-            await scheduleCaffeineUpdates(doses, hl);
+            await scheduleCaffeineUpdates(doses, hl, freq);
         }
     };
 

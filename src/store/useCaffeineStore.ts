@@ -103,9 +103,9 @@ export const useCaffeineStore = create<CaffeineState>()(
                 refreshWidget().catch(() => { });
                 // Re-schedule notification batch with updated projections
                 if (get().notificationsEnabled) {
-                    const { doses } = get();
+                    const { doses, notificationFrequency } = get();
                     const hl = get().getEffectiveHalfLife();
-                    scheduleCaffeineUpdates(doses, hl).catch(() => { });
+                    scheduleCaffeineUpdates(doses, hl, notificationFrequency).catch(() => { });
                 }
             },
 

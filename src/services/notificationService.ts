@@ -1,7 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { calculateStackedCaffeine, Dose } from '../utils/math';
-import { useCaffeineStore } from '../store/useCaffeineStore';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -57,22 +56,24 @@ export async function requestNotificationPermissions(): Promise<boolean> {
  * Call this whenever the user opens the app, adds a drink, or changes frequency —
  * it cancels all existing scheduled notifications first, then regenerates a fresh batch.
  *
- * @param doses             Current dose array from the store
- * @param halfLife          Effective half-life in hours
- * @param frequencyOverride If provided, use this interval (hours) instead of reading from store.
- *                          Pass this when calling from a background task where the store may not
- *                          be fully hydrated (read the value from AsyncStorage instead).
+ * NOTE: Remote push notifications are not supported in Expo Go for SDK 53+.
+ * This function uses only local scheduling (scheduleNotificationAsync with DATE triggers).
+ * For real push notification testing, use a development build instead of Expo Go.
+ *
+ * @param doses         Current dose array from the store
+ * @param halfLife      Effective half-life in hours
+ * @param frequencyHours Notification interval in hours (1, 3, or 6) — must be passed by caller
  */
 export async function scheduleCaffeineUpdates(
     doses: Dose[],
     halfLife: number,
-    frequencyOverride?: 1 | 3 | 6
+    frequencyHours: 1 | 3 | 6
 ): Promise<void> {
     try {
         // Cancel all existing scheduled notifications before regenerating
         await Notifications.cancelAllScheduledNotificationsAsync();
 
-        const frequency = frequencyOverride ?? useCaffeineStore.getState().notificationFrequency ?? 3;
+        const frequency = frequencyHours;
         const now = Date.now();
 
         for (let h = frequency; h <= 24; h += frequency) {
