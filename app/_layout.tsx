@@ -10,6 +10,7 @@ import { LogBox } from 'react-native';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { Colors } from '../src/constants/Colors';
 import '../src/services/backgroundTask'; // Register background task definitions (renamed to .tsx for widget JSX)
+import { unregisterBackgroundTask } from '../src/services/backgroundTask';
 
 // Suppress Expo Go notification warning/error since we use local notifications
 LogBox.ignoreLogs([
@@ -42,6 +43,10 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
+      // One-time migration: remove stale background fetch registration from pre-v2.0.1 installs.
+      // registerBackgroundTask was removed in v2.0.1 but the OS-level registration persists
+      // across app updates unless explicitly unregistered. This is a safe no-op if not registered.
+      unregisterBackgroundTask().catch(() => { });
     }
   }, [loaded]);
 

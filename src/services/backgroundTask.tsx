@@ -1,12 +1,12 @@
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
-import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { requestWidgetUpdate } from 'react-native-android-widget';
 import React from 'react';
 import { GoodEnergyWidget } from '../widget/GoodEnergyWidget';
 import { calculateStackedCaffeine, calculateClearanceTime } from '../utils/math';
+import { scheduleCaffeineUpdates } from './notificationService';
 import { format } from 'date-fns';
 
 import { FEATURES } from '../config/featureFlags';
@@ -47,7 +47,13 @@ function calculateEffectiveHalfLife(baseHalfLife: number, weightKg: number): num
  * Define the background task.
  * This runs periodically even when the app is closed.
  * It reads the caffeine store from AsyncStorage, recalculates the level,
- * sends a notification with the live value, AND updates the home screen widget.
+ * updates the home screen widget, and re-schedules the next 24h batch of
+ * pre-scheduled DATE-trigger notifications (so they never run out).
+ *
+ * NOTE: This task does NOT send immediate notifications itself — all
+ * notifications come from the pre-scheduled batch in scheduleCaffeineUpdates.
+ * This prevents double notifications and ensures the user's chosen frequency
+ * is always respected.
  */
 TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
     // Master kill switch for background tasks
@@ -69,6 +75,8 @@ TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
         const weightKg = state.weightKg || 70;
         const sleepThreshold = state.sleepThresholdMg || 50;
         const notificationsEnabled = state.notificationsEnabled ?? false;
+        // Read frequency directly from persisted state to avoid relying on store hydration
+        const notificationFrequency = (state.notificationFrequency as 1 | 3 | 6) || 3;
 
         const effectiveHalfLife = calculateEffectiveHalfLife(halfLifeHours, weightKg);
         const now = Date.now();
@@ -96,29 +104,12 @@ TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
             }
         }
 
-        // Notifications logic
-        if (!FEATURES.BACKGROUND_NOTIFICATIONS) {
-            return BackgroundFetch.BackgroundFetchResult.NoData;
+        // Re-schedule the next 24h notification batch so coverage never runs out.
+        // Uses frequencyOverride so the correct user-chosen interval is respected
+        // even if the Zustand store is not fully hydrated in this background context.
+        if (FEATURES.BACKGROUND_NOTIFICATIONS && notificationsEnabled && doses.length > 0 && roundedLevel >= 1) {
+            await scheduleCaffeineUpdates(doses, effectiveHalfLife, notificationFrequency);
         }
-
-        if (!notificationsEnabled || doses.length === 0) {
-            return BackgroundFetch.BackgroundFetchResult.NoData;
-        }
-
-        // Only notify if there's meaningful caffeine
-        if (roundedLevel < 1) {
-            return BackgroundFetch.BackgroundFetchResult.NoData;
-        }
-
-        await Notifications.scheduleNotificationAsync({
-            content: {
-                title: '☕ Caffeine Update',
-                body: `Current Level: ${roundedLevel} mg`,
-                data: { type: 'caffeine-update' },
-                sound: false,
-            },
-            trigger: null, // Send immediately
-        });
 
         return BackgroundFetch.BackgroundFetchResult.NewData;
     } catch (error) {

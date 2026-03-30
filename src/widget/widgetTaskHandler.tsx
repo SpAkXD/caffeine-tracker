@@ -56,7 +56,7 @@ async function getWidgetData(): Promise<{ currentLevel: number; crashTime: strin
  * Widget Task Handler — called by Android for every widget lifecycle event.
  *
  * WIDGET_ADDED:   User places widget on home screen
- * WIDGET_UPDATE:  Periodic refresh via updatePeriodMillis (every 30 min)
+ * WIDGET_UPDATE:  Periodic refresh via updatePeriodMillis (every 15 min)
  * WIDGET_RESIZED: User resizes the widget
  * WIDGET_DELETED: User removes the widget
  */

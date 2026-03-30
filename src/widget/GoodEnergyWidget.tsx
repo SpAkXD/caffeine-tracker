@@ -40,12 +40,13 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                 }}
             />
 
-            {/* Center: Big number + unit */}
+            {/* Center: Big number + unit — flex: 1 fills vertical space between label and bottom row */}
             <FlexWidget
                 style={{
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    flex: 1,
                 }}
             >
                 <TextWidget
@@ -85,12 +86,12 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                         letterSpacing: 1,
                     }}
                 />
-                {/* Manual refresh button */}
+                {/* Manual refresh button — larger tap target for easier interaction */}
                 <FlexWidget
                     style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 10,
-                        borderRadius: 8,
+                        paddingHorizontal: 20,
+                        paddingVertical: 14,
+                        borderRadius: 10,
                         backgroundColor: '#FFFFFF1A',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -101,8 +102,8 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                     <TextWidget
                         text="⟳"
                         style={{
-                            fontSize: 14,
-                            color: '#FFFFFF66',
+                            fontSize: 18,
+                            color: '#FFFFFFAA',
                         }}
                     />
                 </FlexWidget>

@@ -47,28 +47,32 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 /**
- * Pre-schedule up to 24 hourly caffeine update notifications.
+ * Pre-schedule up to 24 caffeine update notifications at the user's chosen interval.
  *
  * Instead of relying on BackgroundFetch (which the OS kills after 2-3 hours),
  * we calculate the projected caffeine decay for the next 24 hours and schedule
  * each notification with an exact future Date trigger. This ensures delivery
  * regardless of OS background limits.
  *
- * Call this whenever the user opens the app or adds a drink — it cancels
- * all existing scheduled notifications first, then regenerates a fresh batch.
+ * Call this whenever the user opens the app, adds a drink, or changes frequency —
+ * it cancels all existing scheduled notifications first, then regenerates a fresh batch.
  *
- * @param doses       Current dose array from the store
- * @param halfLife    Effective half-life in hours
+ * @param doses             Current dose array from the store
+ * @param halfLife          Effective half-life in hours
+ * @param frequencyOverride If provided, use this interval (hours) instead of reading from store.
+ *                          Pass this when calling from a background task where the store may not
+ *                          be fully hydrated (read the value from AsyncStorage instead).
  */
 export async function scheduleCaffeineUpdates(
     doses: Dose[],
-    halfLife: number
+    halfLife: number,
+    frequencyOverride?: 1 | 3 | 6
 ): Promise<void> {
     try {
         // Cancel all existing scheduled notifications before regenerating
         await Notifications.cancelAllScheduledNotificationsAsync();
 
-        const frequency = useCaffeineStore.getState().notificationFrequency || 1;
+        const frequency = frequencyOverride ?? useCaffeineStore.getState().notificationFrequency ?? 3;
         const now = Date.now();
 
         for (let h = frequency; h <= 24; h += frequency) {

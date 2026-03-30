@@ -32,7 +32,7 @@ module.exports = {
         HISTORY_CARD: true,
 
         /** "Detailed Statistics" button → opens detailed-stats page */
-        DETAILED_STATS: false,
+        DETAILED_STATS: true,
 
         // ── Add Drink Screen ──────────────────────────────────────────────
         /** The entire add-drink modal with preset cards + custom dose */

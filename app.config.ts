@@ -7,7 +7,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         [
             "expo-notifications",
             {
-                "icon": "./assets/images/icon.png",
+                "icon": "./assets/images/notification-icon.png",
                 "color": "#FF6B35",
                 "sounds": []
             }
@@ -38,7 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         ...config,
         name: "Caffeine Tracker",
         slug: "caffeine-tracker",
-        version: "2.0.2",
+        version: "2.1.0",
         orientation: "portrait",
         icon: "./assets/images/icon.png",
         scheme: "caffinetracker",
@@ -65,7 +65,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             permissions: [
                 "android.permission.POST_NOTIFICATIONS"
             ],
-            versionCode: 11
+            versionCode: 12
         },
         web: {
             bundler: "metro",

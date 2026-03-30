@@ -88,7 +88,7 @@ export default function SettingsScreen() {
                 const doses = useCaffeineStore.getState().doses;
                 const hl = useCaffeineStore.getState().getEffectiveHalfLife();
                 await scheduleCaffeineUpdates(doses, hl);
-                Alert.alert('Notifications Enabled', 'You\'ll receive hourly caffeine updates');
+                Alert.alert('Notifications Enabled', `You'll receive caffeine updates every ${notificationFrequency}h`);
             } else {
                 Alert.alert(
                     'Permission Required',
@@ -218,6 +218,9 @@ export default function SettingsScreen() {
                                         </TouchableOpacity>
                                     ))}
                                 </View>
+                                <Text style={[styles.frequencyHint, { color: colors.primary }]}>
+                                    Reminding you every {notificationFrequency}h
+                                </Text>
                             </View>
                         )}
                     </GlassmorphicCard>
@@ -331,7 +334,7 @@ export default function SettingsScreen() {
                     />
                 )}
 
-                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 2.0.1</Text>
+                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 2.1.0</Text>
 
                 {/* Widget Preview */}
                 {(FEATURES.WIDGET_PREVIEW || isProDebug) && (
@@ -494,6 +497,12 @@ const styles = StyleSheet.create({
     frequencyText: {
         fontWeight: '600',
         fontSize: 15,
+    },
+    frequencyHint: {
+        fontSize: 12,
+        fontWeight: '600',
+        textAlign: 'center',
+        marginTop: 8,
     },
     devToggle: {
         flexDirection: 'row',

@@ -60,6 +60,7 @@ export default function DetailedStatsScreen() {
     const weightKg = useCaffeineStore(state => state.weightKg);
     const sleepQuality = useCaffeineStore(state => state.sleepQuality);
     const getEffectiveHalfLife = useCaffeineStore(state => state.getEffectiveHalfLife);
+    const getWeeklyHistory = useCaffeineStore(state => state.getWeeklyHistory);
 
     const [currentTime, setCurrentTime] = useState(Date.now());
 
@@ -217,11 +218,29 @@ export default function DetailedStatsScreen() {
     const todayDoses = doses.filter(d => d.timestamp >= todayStart.getTime());
     const totalToday = todayDoses.reduce((sum, d) => sum + d.mg, 0);
 
+    // 3-day average daily caffeine (skip days with no intake)
+    const weeklyHistory = getWeeklyHistory();
+    const daysWithData = weeklyHistory.filter(d => d.totalMg > 0);
+    const avgDailyMg = daysWithData.length > 0
+        ? daysWithData.reduce((sum, d) => sum + d.totalMg, 0) / daysWithData.length
+        : 0;
+
+    // Peak caffeine level today: max instantaneous level after each dose in todayDoses
+    let peakCaffeineToday = 0;
+    for (const dose of todayDoses) {
+        const levelAtDose = calculateStackedCaffeine(doses, dose.timestamp, effectiveHalfLife);
+        if (levelAtDose > peakCaffeineToday) peakCaffeineToday = levelAtDose;
+    }
+    // Also check current level in case doses are still rising
+    if (currentLevel > peakCaffeineToday) peakCaffeineToday = currentLevel;
+
     const statCards = [
         { icon: '☕', label: `${Math.round(currentLevel)} mg`, sub: `${todayDoses.length} drink${todayDoses.length !== 1 ? 's' : ''} today (${Math.round(totalToday)} mg)`, color: '#FF6B35' },
         { icon: '⚡', label: peakTime <= now + 5 * 60 * 1000 ? 'Right now' : format(new Date(peakTime), 'h:mm a'), sub: 'Peak energy', color: '#FF9500' },
         { icon: '🌙', label: isClear ? 'Clear' : format(new Date(clearanceTime), 'h:mm a'), sub: `Below ${sleepThreshold}mg`, color: '#5856D6' },
         { icon: '🔬', label: `${effectiveHalfLife.toFixed(1)}h`, sub: `Half-life (${weightKg}kg)`, color: '#34C759' },
+        { icon: '📊', label: avgDailyMg > 0 ? `${Math.round(avgDailyMg)} mg` : '—', sub: '3-day daily avg', color: '#30B0C7' },
+        { icon: '📈', label: peakCaffeineToday > 0 ? `${Math.round(peakCaffeineToday)} mg` : '—', sub: 'Peak caffeine today', color: '#FF6B35' },
     ];
 
     return (
