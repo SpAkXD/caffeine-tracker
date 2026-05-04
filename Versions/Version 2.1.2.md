@@ -36,3 +36,13 @@
 - HOME_WIDGET: true
 - BACKGROUND_NOTIFICATIONS: true
 - BACKGROUND_WIDGET_REFRESH: true
+
+## Future ideas (backlog)
+
+Ideas from planning — not part of 2.1.2; sketch for later iterations.
+
+1. **Daily caffeine budget** — User sets a max mg per day; dashboard shows “remaining budget” and a suggested last-coffee time (reuse existing decay math).
+2. **Cutoff alarm** — One smart local notification, e.g. if you stop caffeine now you’ll be under the sleep threshold by bedtime (uses threshold + bedtime already in the store).
+3. **Export / backup** — JSON or CSV export of doses (privacy-first, no server); optional import when switching phones.
+4. **Presets library + search** — User-saved drinks (name + mg) and quick re-log from history beyond the fixed presets.
+5. **Insights card** — Rolling 7-day average, “heaviest day”, ties to self-reported sleep quality using helpers like `getWeeklyHistory()`.
