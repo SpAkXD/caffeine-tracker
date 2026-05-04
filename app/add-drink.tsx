@@ -8,6 +8,9 @@ import { DrinkPresetCard } from '../src/components/DrinkPresetCard';
 import { StyledButton } from '../src/components/StyledButton';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { Colors } from '../src/constants/Colors';
+import { FEATURES } from '../src/config/featureFlags';
+import { RateAppPromptModal } from '../src/components/RateAppPromptModal';
+import { requestInAppReview } from '../src/services/storeReview';
 
 const ITEM_HEIGHT = 45;
 const VISIBLE_ITEMS = 3;
@@ -186,6 +189,8 @@ export default function AddDrinkScreen() {
     const [modalVisible, setModalVisible] = useState(false);
     const [pendingDrink, setPendingDrink] = useState<{ name: string; mg: number } | null>(null);
     const [moreDrinksOpen, setMoreDrinksOpen] = useState(false);
+    const [ratePromptVisible, setRatePromptVisible] = useState(false);
+    const [ratePromptDoseTotal, setRatePromptDoseTotal] = useState(0);
 
     const PRESETS = [
         { name: 'Espresso', mg: 63 },
@@ -274,10 +279,17 @@ export default function AddDrinkScreen() {
     };
 
     const handleConfirm = () => {
-        if (pendingDrink) {
-            addDose(pendingDrink.mg, getTimestamp());
-            setModalVisible(false);
-            setPendingDrink(null);
+        if (!pendingDrink) return;
+        addDose(pendingDrink.mg, getTimestamp());
+        setModalVisible(false);
+        const count = useCaffeineStore.getState().doses.length;
+        setPendingDrink(null);
+
+        const showReviewPrompt = FEATURES.STORE_REVIEW && count > 0 && count % 10 === 0;
+        if (showReviewPrompt) {
+            setRatePromptDoseTotal(count);
+            setRatePromptVisible(true);
+        } else {
             router.back();
         }
     };
@@ -551,6 +563,17 @@ export default function AddDrinkScreen() {
                     </View>
                 </View>
             </Modal>
+
+            <RateAppPromptModal
+                visible={ratePromptVisible}
+                colors={colors}
+                totalDosesLogged={ratePromptDoseTotal}
+                onRate={requestInAppReview}
+                onNotNow={() => {
+                    setRatePromptVisible(false);
+                    router.back();
+                }}
+            />
         </View>
     );
 }

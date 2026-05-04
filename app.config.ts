@@ -8,7 +8,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             "expo-notifications",
             {
                 "icon": "./assets/images/notification-icon.png",
-                "color": "#FF6B35",
+                "color": "#050505",
                 "sounds": []
             }
         ]
@@ -38,7 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         ...config,
         name: "Caffeine Tracker",
         slug: "caffeine-tracker",
-        version: "2.1.1",
+        version: "2.1.2",
         orientation: "portrait",
         icon: "./assets/images/icon.png",
         scheme: "caffinetracker",
@@ -65,7 +65,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             permissions: [
                 "android.permission.POST_NOTIFICATIONS"
             ],
-            versionCode: 13
+            versionCode: 14
         },
         web: {
             bundler: "metro",
@@ -80,7 +80,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             router: {},
             eas: {
                 projectId: "f92043b2-2d66-4e77-99fe-e538e672b8e4"
-            }
+            },
+            /** Numeric App Store ID from App Store Connect (e.g. "1234567890"). Required for Settings → Rate us on iOS. */
+            iosAppStoreId: process.env.EXPO_PUBLIC_IOS_APP_STORE_ID ?? "",
         }
     };
 };

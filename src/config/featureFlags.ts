@@ -29,6 +29,7 @@ export const FEATURES = FLAGS as {
     WIDGET_PREVIEW: boolean;
     CLEAR_DATA: boolean;
     INFO_POPUPS: boolean;
+    STORE_REVIEW: boolean;
     HOME_WIDGET: boolean;
     BACKGROUND_NOTIFICATIONS: boolean;
     BACKGROUND_WIDGET_REFRESH: boolean;

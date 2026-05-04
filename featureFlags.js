@@ -63,6 +63,9 @@ module.exports = {
         /** Info popup icons next to settings metrics (Weight, Half-Life, Threshold) */
         INFO_POPUPS: true,
 
+        /** Periodic in-app review prompt (every 10th logged drink) + Settings → Rate us */
+        STORE_REVIEW: true,
+
         // ── Home Screen Widget ────────────────────────────────────────────
         /** Real Android home screen widget (GoodEnergy) */
         HOME_WIDGET: true,

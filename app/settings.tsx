@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Alert, ScrollView, Switch, Linking, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
+import Constants from 'expo-constants';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { StyledButton } from '../src/components/StyledButton';
 import { GlassmorphicCard } from '../src/components/GlassmorphicCard';
@@ -12,6 +13,7 @@ import {
     scheduleCaffeineUpdates,
     scheduleTestNotification,
 } from '../src/services/notificationService';
+import { openStoreListing } from '../src/services/storeReview';
 import { WidgetPreview } from '../src/components/WidgetPreview';
 
 import { FEATURES } from '../src/config/featureFlags';
@@ -325,6 +327,31 @@ export default function SettingsScreen() {
                     </GlassmorphicCard>
                 )}
 
+                {FEATURES.STORE_REVIEW && (
+                    <GlassmorphicCard style={styles.card}>
+                        <TouchableOpacity
+                            style={styles.rateRow}
+                            onPress={async () => {
+                                try {
+                                    await openStoreListing();
+                                } catch {
+                                    Alert.alert('Store', 'Could not open the store. Try again later.');
+                                }
+                            }}
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.rateRowLeft}>
+                                <Ionicons name="star-outline" size={24} color={colors.primary} />
+                                <Text style={[styles.rateTitle, { color: colors.text }]}>Rate Caffeine Tracker</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                        <Text style={[styles.rateHint, { color: colors.textSecondary }]}>
+                            Opens the Play Store or App Store listing
+                        </Text>
+                    </GlassmorphicCard>
+                )}
+
                 {FEATURES.CLEAR_DATA && (
                     <StyledButton
                         title="Reset All Data"
@@ -334,7 +361,9 @@ export default function SettingsScreen() {
                     />
                 )}
 
-                <Text style={[styles.version, { color: colors.textSecondary }]}>Version 2.1.0</Text>
+                <Text style={[styles.version, { color: colors.textSecondary }]}>
+                    Version {Constants.expoConfig?.version ?? '—'}
+                </Text>
 
                 {/* Widget Preview */}
                 {(FEATURES.WIDGET_PREVIEW || isProDebug) && (
@@ -467,6 +496,26 @@ const styles = StyleSheet.create({
     },
     resetButton: {
         marginTop: 20,
+    },
+    rateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    rateRowLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        flexShrink: 1,
+    },
+    rateTitle: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    rateHint: {
+        marginTop: 12,
+        fontSize: 13,
+        lineHeight: 18,
     },
     version: {
         textAlign: 'center',
