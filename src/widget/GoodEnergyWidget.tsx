@@ -24,7 +24,8 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                 alignItems: 'center',
                 backgroundColor: '#000000',
                 borderRadius: 16,
-                padding: 14,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
             }}
             clickAction="OPEN_APP"
             accessibilityLabel="Caffeine tracker widget"
@@ -33,10 +34,10 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
             <TextWidget
                 text="CAFFEINE"
                 style={{
-                    fontSize: 10,
+                    fontSize: 9,
                     color: '#59595980',
                     fontFamily: 'monospace',
-                    letterSpacing: 2,
+                    letterSpacing: 1.5,
                 }}
             />
 
@@ -47,12 +48,13 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                     alignItems: 'center',
                     justifyContent: 'center',
                     flex: 1,
+                    width: 'match_parent',
                 }}
             >
                 <TextWidget
                     text={`${currentLevel}`}
                     style={{
-                        fontSize: 48,
+                        fontSize: 44,
                         color: '#FFFFFF',
                         fontFamily: 'monospace',
                     }}
@@ -60,10 +62,10 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                 <TextWidget
                     text="mg"
                     style={{
-                        fontSize: 14,
+                        fontSize: 12,
                         color: '#FFFFFF4D',
                         fontFamily: 'monospace',
-                        letterSpacing: 3,
+                        letterSpacing: 2.5,
                     }}
                 />
             </FlexWidget>
@@ -75,6 +77,8 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     width: 'match_parent',
+                    flexWrap: 'wrap',
+                    gap: 8,
                 }}
             >
                 <TextWidget
@@ -83,14 +87,17 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                         fontSize: 10,
                         color: '#FFFFFF66',
                         fontFamily: 'monospace',
-                        letterSpacing: 1,
+                        letterSpacing: 0.8,
+                        flex: 1,
                     }}
                 />
                 {/* Manual refresh button — larger tap target for easier interaction */}
                 <FlexWidget
                     style={{
-                        paddingHorizontal: 20,
-                        paddingVertical: 14,
+                        minWidth: 50,
+                        minHeight: 44,
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
                         borderRadius: 10,
                         backgroundColor: '#FFFFFF1A',
                         alignItems: 'center',
@@ -100,9 +107,9 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                     clickActionData={{ action: 'REFRESH_WIDGET' }}
                 >
                     <TextWidget
-                        text="⟳"
+                        text="↻"
                         style={{
-                            fontSize: 18,
+                            fontSize: 20,
                             color: '#FFFFFFAA',
                         }}
                     />

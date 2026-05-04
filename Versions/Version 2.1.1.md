@@ -13,6 +13,15 @@
 
 - **No remote push tokens** — confirmed: no `getExpoPushTokenAsync` or remote push API usage anywhere in the codebase. All notifications are local (`scheduleNotificationAsync` with DATE triggers only).
 
+### UI / assets
+
+- **Android notification icon** — added `assets/images/notification-icon.png` for `expo-notifications` (proper status-bar glyph asset).
+- **GoodEnergy home widget** — tighter padding, slightly smaller type, refresh control uses ↻ with a larger tap target and flex layout for long crash-time text.
+
+### Feature flags
+
+- **NOTIFICATIONS** and **WIDGET_PREVIEW** enabled for this release build.
+
 ## Enabled Features (featureFlags.js)
 
 - CAFFEINE_DISPLAY: true

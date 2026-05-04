@@ -43,7 +43,7 @@ module.exports = {
         THEME_TOGGLE: true,
 
         /** Push notification toggle + frequency selector */
-        NOTIFICATIONS: false,
+        NOTIFICATIONS: true,
 
         /** Body weight slider (adjusts effective half-life) */
         WEIGHT_SETTING: true,
@@ -55,7 +55,7 @@ module.exports = {
         THRESHOLD_SETTING: true,
 
         /** In-app widget preview card in settings */
-        WIDGET_PREVIEW: false,
+        WIDGET_PREVIEW: true,
 
         /** "Reset All Data" button */
         CLEAR_DATA: true,
