@@ -5,8 +5,6 @@ export const STAGGER_MS = 64;
 export const STAGGER_FAST_MS = 52;
 /** Hourly table row cascade */
 export const ROW_STAGGER_MS = 28;
-/** Bento tiles on detailed statistics */
-export const BENTO_STAGGER_MS = 40;
 /** Cap total delay so long screens don’t feel sluggish */
 export const MAX_STAGGER_DELAY_MS = 560;
 

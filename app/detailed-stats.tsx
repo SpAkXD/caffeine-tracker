@@ -1,31 +1,11 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, AppState, Platform, ScrollView } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, AppState, LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, {
-    Path,
-    Line,
-    Text as SvgText,
-    Defs,
-    LinearGradient as SvgLinearGradient,
-    Stop,
-    Circle,
-    Rect,
-} from 'react-native-svg';
-import Animated, {
-    FadeIn,
-    FadeInDown,
-    ZoomIn,
-    Easing,
-    useSharedValue,
-    useAnimatedStyle,
-    useAnimatedScrollHandler,
-    useAnimatedProps,
-    withSpring,
-    withTiming,
-} from 'react-native-reanimated';
+import Svg, { Path, Line, Text as SvgText, Defs, LinearGradient as SvgLinearGradient, Stop, Circle, Rect } from 'react-native-svg';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { subDays, startOfDay, format } from 'date-fns';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { Colors } from '../src/constants/Colors';
@@ -35,7 +15,7 @@ import { PressableScale } from '../src/components/PressableScale';
 import { calculateStackedCaffeine, calculateAlertness } from '../src/utils/math';
 import { FEATURES } from '../src/config/featureFlags';
 import { useReduceMotion } from '../src/hooks/useReduceMotion';
-import { ROW_STAGGER_MS, BENTO_STAGGER_MS } from '../src/constants/motion';
+import { ROW_STAGGER_MS } from '../src/constants/motion';
 
 const CHART_W = 340;
 const CHART_H = 180;
@@ -45,9 +25,6 @@ const INNER_H = CHART_H - PAD.top - PAD.bottom;
 
 const STATS_SLOTS = { header: 0, hero: 1, metrics: 2, chart: 3, table: 4 } as const;
 const HOUR_ROW_ANIM_CAP = 12;
-
-const AnimatedPath = Animated.createAnimatedComponent(Path);
-const AnimatedScrollView = Animated.ScrollView;
 
 interface HourlyEntry {
     time: string;
@@ -86,16 +63,6 @@ function createSmoothPath(points: { x: number; y: number }[]): string {
     return path;
 }
 
-/** Chord-sum lower bound — scale up slightly so dash draw covers smooth curve */
-function approximateLineDrawLength(points: { x: number; y: number }[]): number {
-    if (points.length < 2) return 40;
-    let s = 0;
-    for (let i = 1; i < points.length; i++) {
-        s += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
-    }
-    return Math.max(s * 1.14, 12);
-}
-
 type BentoIcon = React.ComponentProps<typeof Ionicons>['name'];
 
 function BentoTile({
@@ -105,8 +72,6 @@ function BentoTile({
     hint,
     colors,
     theme,
-    tileIndex,
-    enableMotion,
 }: {
     icon: BentoIcon;
     label: string;
@@ -114,27 +79,13 @@ function BentoTile({
     hint?: string;
     colors: (typeof Colors)['light'];
     theme: 'light' | 'dark';
-    tileIndex: number;
-    enableMotion: boolean;
 }) {
     const surface =
         theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
-
-    const inner = (
+    return (
         <View style={[styles.bentoTile, { backgroundColor: surface, borderColor: colors.border }]}>
             <View style={styles.bentoTileTop}>
-                {enableMotion ? (
-                    <Animated.View
-                        entering={ZoomIn.delay(tileIndex * BENTO_STAGGER_MS + 22)
-                            .springify()
-                            .damping(16)
-                            .stiffness(260)}
-                    >
-                        <Ionicons name={icon} size={18} color={colors.primary} />
-                    </Animated.View>
-                ) : (
-                    <Ionicons name={icon} size={18} color={colors.primary} />
-                )}
+                <Ionicons name={icon} size={18} color={colors.primary} />
                 <Text style={[styles.bentoValue, { color: colors.text }]} numberOfLines={1}>
                     {value}
                 </Text>
@@ -149,85 +100,6 @@ function BentoTile({
             ) : null}
         </View>
     );
-
-    if (!enableMotion) {
-        return inner;
-    }
-
-    return (
-        <Animated.View
-            entering={FadeIn.delay(tileIndex * BENTO_STAGGER_MS).duration(220)}
-        >
-            {inner}
-        </Animated.View>
-    );
-}
-
-function HourlySegmentChip({
-    label,
-    selected,
-    onPress,
-    colors,
-    theme,
-    enableMotion,
-}: {
-    label: string;
-    selected: boolean;
-    onPress: () => void;
-    colors: (typeof Colors)['light'];
-    theme: 'light' | 'dark';
-    enableMotion: boolean;
-}) {
-    const scale = useSharedValue(selected ? 1.035 : 1);
-
-    useEffect(() => {
-        if (!enableMotion) {
-            scale.value = 1;
-            return;
-        }
-        scale.value = withSpring(selected ? 1.045 : 1, {
-            damping: 15,
-            stiffness: 220,
-            mass: 0.65,
-        });
-    }, [selected, enableMotion, scale]);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: scale.value }],
-    }));
-
-    const chipInner = (
-        <PressableScale
-            onPress={onPress}
-            style={[
-                styles.segmentChip,
-                {
-                    backgroundColor: selected
-                        ? colors.primary + '22'
-                        : theme === 'dark'
-                          ? 'rgba(255,255,255,0.06)'
-                          : 'rgba(0,0,0,0.04)',
-                    borderColor: selected ? colors.primary : colors.border,
-                },
-            ]}
-        >
-            <Text
-                style={{
-                    fontSize: 12,
-                    fontWeight: '700',
-                    color: selected ? colors.primary : colors.textSecondary,
-                }}
-            >
-                {label}
-            </Text>
-        </PressableScale>
-    );
-
-    if (!enableMotion) {
-        return chipInner;
-    }
-
-    return <Animated.View style={animatedStyle}>{chipInner}</Animated.View>;
 }
 
 export default function DetailedStatsScreen() {
@@ -241,22 +113,9 @@ export default function DetailedStatsScreen() {
     const sleepQuality = useCaffeineStore(state => state.sleepQuality);
     const use24HourFormat = useCaffeineStore(state => state.use24HourFormat);
     const getEffectiveHalfLife = useCaffeineStore(state => state.getEffectiveHalfLife);
-    const currentLevel = useCaffeineStore(state => state.currentLevel);
-    const storeClearanceTime = useCaffeineStore(state => state.clearanceTime);
 
     const [currentTime, setCurrentTime] = useState(Date.now());
     const [hourlyFilter, setHourlyFilter] = useState<'all' | 'past' | 'future'>('all');
-    const [heroMg, setHeroMg] = useState(() =>
-        Math.round(useCaffeineStore.getState().currentLevel)
-    );
-
-    const currentLevelRef = useRef(useCaffeineStore.getState().currentLevel);
-    const screenFocusedRef = useRef(false);
-    const prevLevelSyncRef = useRef<number | null>(null);
-
-    useEffect(() => {
-        currentLevelRef.current = currentLevel;
-    }, [currentLevel]);
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', nextAppState => {
@@ -270,80 +129,9 @@ export default function DetailedStatsScreen() {
     const effectiveHalfLife = getEffectiveHalfLife();
     const now = currentTime;
 
+    const currentLevel = useCaffeineStore(state => state.currentLevel);
+    const storeClearanceTime = useCaffeineStore(state => state.clearanceTime);
     const qualityMultiplier = sleepQuality === 'great' ? 1.0 : sleepQuality === 'average' ? 0.8 : 0.6;
-
-    const motionOn = FEATURES.UI_MOTION && !reduceMotion;
-    const scrollY = useSharedValue(0);
-    const lineDashOffset = useSharedValue(0);
-
-    useFocusEffect(
-        useCallback(() => {
-            screenFocusedRef.current = true;
-            prevLevelSyncRef.current = null;
-
-            const target = Math.round(currentLevelRef.current);
-
-            if (!FEATURES.UI_MOTION || reduceMotion) {
-                setHeroMg(target);
-                return () => {
-                    screenFocusedRef.current = false;
-                    prevLevelSyncRef.current = null;
-                };
-            }
-
-            const start = Math.round(
-                Math.min(target, Math.max(0, target * 0.65))
-            );
-            setHeroMg(start);
-
-            let frame = 0;
-            const t0 = Date.now();
-            const dur = 400;
-            const ease = (u: number) => 1 - Math.pow(1 - u, 3);
-
-            const tick = () => {
-                const u = Math.min(1, (Date.now() - t0) / dur);
-                setHeroMg(Math.round(start + (target - start) * ease(u)));
-                if (u < 1) {
-                    frame = requestAnimationFrame(tick);
-                }
-            };
-            frame = requestAnimationFrame(tick);
-
-            return () => {
-                screenFocusedRef.current = false;
-                prevLevelSyncRef.current = null;
-                cancelAnimationFrame(frame);
-            };
-        }, [reduceMotion])
-    );
-
-    useEffect(() => {
-        if (!screenFocusedRef.current) {
-            return;
-        }
-        if (prevLevelSyncRef.current === null) {
-            prevLevelSyncRef.current = currentLevel;
-            return;
-        }
-        if (prevLevelSyncRef.current === currentLevel) {
-            return;
-        }
-        prevLevelSyncRef.current = currentLevel;
-        setHeroMg(Math.round(currentLevel));
-    }, [currentLevel]);
-
-    const scrollHandler = useAnimatedScrollHandler({
-        onScroll: e => {
-            scrollY.value = e.contentOffset.y;
-        },
-    });
-
-    const parallaxStyle = useAnimatedStyle(() => {
-        const y = scrollY.value * 0.045;
-        const ty = Math.min(12, Math.max(-12, y));
-        return { transform: [{ translateY: ty }] };
-    });
 
     const timeFmt = use24HourFormat ? 'HH:mm' : 'h:mm a';
 
@@ -378,7 +166,6 @@ export default function DetailedStatsScreen() {
 
         const svgPoints = points.map((p, i) => ({ x: getX(i), y: getY(p.level) }));
         const linePath = createSmoothPath(svgPoints);
-        const linePathLength = approximateLineDrawLength(svgPoints);
 
         const areaPath =
             linePath +
@@ -430,7 +217,6 @@ export default function DetailedStatsScreen() {
 
         return {
             linePath,
-            linePathLength,
             areaPath,
             hourLabels,
             nowX,
@@ -441,23 +227,6 @@ export default function DetailedStatsScreen() {
             nightZoneFill,
         };
     }, [doses, now, effectiveHalfLife, sleepThreshold, theme]);
-
-    useEffect(() => {
-        const L = chartData.linePathLength;
-        if (!motionOn || Platform.OS === 'web' || L < 8) {
-            lineDashOffset.value = 0;
-            return;
-        }
-        lineDashOffset.value = L;
-        lineDashOffset.value = withTiming(0, {
-            duration: 1000,
-            easing: Easing.out(Easing.cubic),
-        });
-    }, [motionOn, chartData.linePath, chartData.linePathLength]);
-
-    const lineAnimatedProps = useAnimatedProps(() => ({
-        strokeDashoffset: lineDashOffset.value,
-    }));
 
     const hourlyBreakdown = useMemo(() => {
         const entries: HourlyEntry[] = [];
@@ -588,142 +357,12 @@ export default function DetailedStatsScreen() {
     const tableBorder = colors.border;
     const zebra = theme === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.035)';
 
-    const gradientColors =
-        theme === 'dark'
-            ? (['#050505', '#1c1c1e', '#151515'] as const)
-            : (['#EFEFF4', '#F9F9FB', '#FFFFFF'] as const);
-
-    const chartBreathEntering = motionOn
-        ? FadeInDown.delay(90).springify().damping(22).stiffness(268)
-        : undefined;
-
-    const drawLineMotion =
-        motionOn && Platform.OS !== 'web';
-
-    const trendChartBody = (
-        <>
-            <Text style={[styles.chartTitle, { color: colors.text }]}>Trend</Text>
-            <Text style={[styles.chartSubtitle, { color: colors.textSecondary }]}>
-                12-hour forecast vs sleep line
-            </Text>
-            <Svg width={CHART_W} height={CHART_H}>
-                <Defs>
-                    <SvgLinearGradient id="detailGrad" x1="0" y1="0" x2="0" y2="1">
-                        <Stop offset="0" stopColor={colors.primary} stopOpacity={0.25} />
-                        <Stop offset="1" stopColor={colors.primary} stopOpacity={0} />
-                    </SvgLinearGradient>
-                </Defs>
-
-                {chartData.nightZones.map((zone, i) => (
-                    <Rect
-                        key={`night-${i}`}
-                        x={zone.x}
-                        y={PAD.top}
-                        width={zone.width}
-                        height={INNER_H}
-                        fill={chartData.nightZoneFill}
-                        rx={4}
-                    />
-                ))}
-
-                <Path d={chartData.areaPath} fill="url(#detailGrad)" />
-
-                {drawLineMotion ? (
-                    <AnimatedPath
-                        d={chartData.linePath}
-                        stroke={colors.primary}
-                        strokeWidth={2.5}
-                        fill="none"
-                        strokeLinecap="round"
-                        strokeDasharray={[
-                            chartData.linePathLength,
-                            chartData.linePathLength,
-                        ]}
-                        animatedProps={lineAnimatedProps}
-                    />
-                ) : (
-                    <Path
-                        d={chartData.linePath}
-                        stroke={colors.primary}
-                        strokeWidth={2.5}
-                        fill="none"
-                        strokeLinecap="round"
-                    />
-                )}
-
-                <Line
-                    x1={PAD.left}
-                    y1={chartData.thresholdY}
-                    x2={CHART_W - PAD.right}
-                    y2={chartData.thresholdY}
-                    stroke={colors.accent}
-                    strokeWidth={1}
-                    strokeDasharray="5,3"
-                    strokeOpacity={0.5}
-                />
-                <SvgText
-                    x={CHART_W - PAD.right - 2}
-                    y={chartData.thresholdY - 4}
-                    fill={colors.accent}
-                    fontSize={8}
-                    textAnchor="end"
-                    opacity={0.65}
-                >
-                    Sleep {sleepThreshold} mg
-                </SvgText>
-
-                <Line
-                    x1={chartData.nowX}
-                    y1={PAD.top}
-                    x2={chartData.nowX}
-                    y2={PAD.top + INNER_H}
-                    stroke={colors.primary}
-                    strokeWidth={1.5}
-                    strokeDasharray="3,3"
-                    strokeOpacity={0.5}
-                />
-                <Circle cx={chartData.nowX} cy={chartData.nowY} r={5} fill={colors.primary} opacity={0.3} />
-                <Circle cx={chartData.nowX} cy={chartData.nowY} r={3} fill={colors.primary} />
-
-                {chartData.hourLabels.map((lab, i) => (
-                    <SvgText
-                        key={i}
-                        x={lab.x}
-                        y={PAD.top + INNER_H + 16}
-                        fill={colors.textSecondary}
-                        fontSize={9}
-                        textAnchor="middle"
-                        opacity={0.65}
-                    >
-                        {lab.label}
-                    </SvgText>
-                ))}
-            </Svg>
-        </>
-    );
-
-    const MainScroll =
-        FEATURES.UI_MOTION && Platform.OS !== 'web' ? AnimatedScrollView : ScrollView;
-    const scrollProps =
-        FEATURES.UI_MOTION && Platform.OS !== 'web'
-            ? {
-                  onScroll: scrollHandler,
-                  scrollEventThrottle: 16 as const,
-              }
-            : {};
-
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            {motionOn ? (
-                <Animated.View
-                    style={[StyleSheet.absoluteFillObject, parallaxStyle]}
-                    pointerEvents="none"
-                >
-                    <LinearGradient colors={gradientColors} style={StyleSheet.absoluteFillObject} />
-                </Animated.View>
-            ) : (
-                <LinearGradient colors={gradientColors} style={StyleSheet.absoluteFillObject} />
-            )}
+            <LinearGradient
+                colors={theme === 'dark' ? ['#050505', '#1c1c1e', '#151515'] : ['#EFEFF4', '#F9F9FB', '#FFFFFF']}
+                style={StyleSheet.absoluteFill}
+            />
             <SafeAreaView style={styles.safeArea}>
                 <FadeInSlot slotIndex={STATS_SLOTS.header} variant="fast">
                     <View style={styles.header}>
@@ -746,18 +385,14 @@ export default function DetailedStatsScreen() {
                     </View>
                 </FadeInSlot>
 
-                <MainScroll
-                    {...scrollProps}
-                    contentContainerStyle={styles.content}
-                    showsVerticalScrollIndicator={false}
-                >
+                <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                     <FadeInSlot slotIndex={STATS_SLOTS.hero} variant="fast">
                         <GlassmorphicCard style={[styles.heroCard, { marginVertical: 8 }]}>
                             <Text style={[styles.heroEyebrow, { color: colors.textSecondary }]}>
                                 Current level
                             </Text>
                             <Text style={[styles.heroMg, { color: colors.primary }]}>
-                                {heroMg}
+                                {Math.round(currentLevel)}
                                 <Text style={[styles.heroMgUnit, { color: colors.textSecondary }]}>
                                     {' '}
                                     mg
@@ -790,7 +425,7 @@ export default function DetailedStatsScreen() {
                                 Last 7 days
                             </Text>
                             <View style={styles.weekStrip}>
-                                {sevenDays.map(d => {
+                                {sevenDays.map((d, i) => {
                                     const h = d.totalMg <= 0 ? 4 : 8 + (d.totalMg / weekMaxMg) * 28;
                                     return (
                                         <View key={d.date} style={styles.weekBarCol}>
@@ -839,8 +474,6 @@ export default function DetailedStatsScreen() {
                             </Text>
                             <View style={styles.bentoGrid}>
                                 <BentoTile
-                                    tileIndex={0}
-                                    enableMotion={motionOn}
                                     icon="calendar-outline"
                                     label="7-day total"
                                     value={`${Math.round(sum7Mg)} mg`}
@@ -849,8 +482,6 @@ export default function DetailedStatsScreen() {
                                     theme={theme}
                                 />
                                 <BentoTile
-                                    tileIndex={1}
-                                    enableMotion={motionOn}
                                     icon="stats-chart-outline"
                                     label="Avg / day"
                                     value={
@@ -858,17 +489,11 @@ export default function DetailedStatsScreen() {
                                             ? `${Math.round(avgMgPerDayActive)} mg`
                                             : '—'
                                     }
-                                    hint={
-                                        daysWithIntake.length
-                                            ? `${daysWithIntake.length} active days`
-                                            : 'No drinks'
-                                    }
+                                    hint={daysWithIntake.length ? `${daysWithIntake.length} active days` : 'No drinks'}
                                     colors={colors}
                                     theme={theme}
                                 />
                                 <BentoTile
-                                    tileIndex={2}
-                                    enableMotion={motionOn}
                                     icon="water-outline"
                                     label="Avg / drink"
                                     value={
@@ -881,8 +506,6 @@ export default function DetailedStatsScreen() {
                                     theme={theme}
                                 />
                                 <BentoTile
-                                    tileIndex={3}
-                                    enableMotion={motionOn}
                                     icon="flash-outline"
                                     label="Peak energy"
                                     value={
@@ -895,8 +518,6 @@ export default function DetailedStatsScreen() {
                                     theme={theme}
                                 />
                                 <BentoTile
-                                    tileIndex={4}
-                                    enableMotion={motionOn}
                                     icon="moon-outline"
                                     label="Sleep threshold"
                                     value={isClear ? 'Clear' : format(new Date(clearanceTime), timeFmt)}
@@ -905,8 +526,6 @@ export default function DetailedStatsScreen() {
                                     theme={theme}
                                 />
                                 <BentoTile
-                                    tileIndex={5}
-                                    enableMotion={motionOn}
                                     icon="flask-outline"
                                     label="Half-life"
                                     value={`${effectiveHalfLife.toFixed(1)} h`}
@@ -920,13 +539,88 @@ export default function DetailedStatsScreen() {
 
                     <FadeInSlot slotIndex={STATS_SLOTS.chart} variant="fast">
                         <GlassmorphicCard style={{ marginVertical: 8 }}>
-                            {motionOn && chartBreathEntering ? (
-                                <Animated.View entering={chartBreathEntering}>
-                                    {trendChartBody}
-                                </Animated.View>
-                            ) : (
-                                trendChartBody
-                            )}
+                            <Text style={[styles.chartTitle, { color: colors.text }]}>Trend</Text>
+                            <Text style={[styles.chartSubtitle, { color: colors.textSecondary }]}>
+                                12-hour forecast vs sleep line
+                            </Text>
+                            <Svg width={CHART_W} height={CHART_H}>
+                                <Defs>
+                                    <SvgLinearGradient id="detailGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <Stop offset="0" stopColor={colors.primary} stopOpacity={0.25} />
+                                        <Stop offset="1" stopColor={colors.primary} stopOpacity={0} />
+                                    </SvgLinearGradient>
+                                </Defs>
+
+                                {chartData.nightZones.map((zone, i) => (
+                                    <Rect
+                                        key={`night-${i}`}
+                                        x={zone.x}
+                                        y={PAD.top}
+                                        width={zone.width}
+                                        height={INNER_H}
+                                        fill={chartData.nightZoneFill}
+                                        rx={4}
+                                    />
+                                ))}
+
+                                <Path d={chartData.areaPath} fill="url(#detailGrad)" />
+
+                                <Path
+                                    d={chartData.linePath}
+                                    stroke={colors.primary}
+                                    strokeWidth={2.5}
+                                    fill="none"
+                                    strokeLinecap="round"
+                                />
+
+                                <Line
+                                    x1={PAD.left}
+                                    y1={chartData.thresholdY}
+                                    x2={CHART_W - PAD.right}
+                                    y2={chartData.thresholdY}
+                                    stroke={colors.accent}
+                                    strokeWidth={1}
+                                    strokeDasharray="5,3"
+                                    strokeOpacity={0.5}
+                                />
+                                <SvgText
+                                    x={CHART_W - PAD.right - 2}
+                                    y={chartData.thresholdY - 4}
+                                    fill={colors.accent}
+                                    fontSize={8}
+                                    textAnchor="end"
+                                    opacity={0.65}
+                                >
+                                    Sleep {sleepThreshold} mg
+                                </SvgText>
+
+                                <Line
+                                    x1={chartData.nowX}
+                                    y1={PAD.top}
+                                    x2={chartData.nowX}
+                                    y2={PAD.top + INNER_H}
+                                    stroke={colors.primary}
+                                    strokeWidth={1.5}
+                                    strokeDasharray="3,3"
+                                    strokeOpacity={0.5}
+                                />
+                                <Circle cx={chartData.nowX} cy={chartData.nowY} r={5} fill={colors.primary} opacity={0.3} />
+                                <Circle cx={chartData.nowX} cy={chartData.nowY} r={3} fill={colors.primary} />
+
+                                {chartData.hourLabels.map((lab, i) => (
+                                    <SvgText
+                                        key={i}
+                                        x={lab.x}
+                                        y={PAD.top + INNER_H + 16}
+                                        fill={colors.textSecondary}
+                                        fontSize={9}
+                                        textAnchor="middle"
+                                        opacity={0.65}
+                                    >
+                                        {lab.label}
+                                    </SvgText>
+                                ))}
+                            </Svg>
                         </GlassmorphicCard>
                     </FadeInSlot>
 
@@ -945,17 +639,36 @@ export default function DetailedStatsScreen() {
                                         { id: 'past' as const, label: 'Earlier' },
                                         { id: 'future' as const, label: 'Next 12h' },
                                     ] as const
-                                ).map(seg => (
-                                    <HourlySegmentChip
-                                        key={seg.id}
-                                        label={seg.label}
-                                        selected={hourlyFilter === seg.id}
-                                        onPress={() => setHourlyFilter(seg.id)}
-                                        colors={colors}
-                                        theme={theme}
-                                        enableMotion={motionOn}
-                                    />
-                                ))}
+                                ).map(seg => {
+                                    const on = hourlyFilter === seg.id;
+                                    return (
+                                        <PressableScale
+                                            key={seg.id}
+                                            onPress={() => setHourlyFilter(seg.id)}
+                                            style={[
+                                                styles.segmentChip,
+                                                {
+                                                    backgroundColor: on
+                                                        ? colors.primary + '22'
+                                                        : theme === 'dark'
+                                                          ? 'rgba(255,255,255,0.06)'
+                                                          : 'rgba(0,0,0,0.04)',
+                                                    borderColor: on ? colors.primary : colors.border,
+                                                },
+                                            ]}
+                                        >
+                                            <Text
+                                                style={{
+                                                    fontSize: 12,
+                                                    fontWeight: '700',
+                                                    color: on ? colors.primary : colors.textSecondary,
+                                                }}
+                                            >
+                                                {seg.label}
+                                            </Text>
+                                        </PressableScale>
+                                    );
+                                })}
                             </View>
 
                             <View
@@ -1005,7 +718,10 @@ export default function DetailedStatsScreen() {
                                             {entry.isNow ? 'Now' : entry.time}
                                         </Text>
                                         <Text
-                                            style={[styles.tableLevel, { color: colors.text }]}
+                                            style={[
+                                                styles.tableLevel,
+                                                { color: colors.text },
+                                            ]}
                                         >
                                             {entry.level} mg
                                         </Text>
@@ -1040,13 +756,17 @@ export default function DetailedStatsScreen() {
                                     );
                                 }
 
-                                return <View key={key}>{rowEl}</View>;
+                                return (
+                                    <View key={key}>
+                                        {rowEl}
+                                    </View>
+                                );
                             })}
                         </GlassmorphicCard>
                     </FadeInSlot>
 
                     <View style={{ height: 40 }} />
-                </MainScroll>
+                </ScrollView>
             </SafeAreaView>
         </View>
     );
