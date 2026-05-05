@@ -1,5 +1,6 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Modal, Pressable, Animated, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, Alert, Modal, Pressable, Animated as RNAnimated, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +12,10 @@ import { Colors } from '../src/constants/Colors';
 import { FEATURES } from '../src/config/featureFlags';
 import { RateAppPromptModal } from '../src/components/RateAppPromptModal';
 import { requestInAppReview } from '../src/services/storeReview';
+import { FadeInSlot } from '../src/components/FadeInSlot';
+import { PressableScale } from '../src/components/PressableScale';
+import { useReduceMotion } from '../src/hooks/useReduceMotion';
+import { modalCardEntering } from '../src/constants/motion';
 
 const ITEM_HEIGHT = 45;
 const VISIBLE_ITEMS = 3;
@@ -28,7 +33,7 @@ interface WheelPickerProps {
 function AnimatedWheelItem({ item, index, scrollY, textColor, width }: {
     item: string;
     index: number;
-    scrollY: Animated.Value;
+    scrollY: RNAnimated.Value;
     textColor: string;
     width: number;
 }) {
@@ -53,7 +58,7 @@ function AnimatedWheelItem({ item, index, scrollY, textColor, width }: {
     });
 
     return (
-        <Animated.View
+        <RNAnimated.View
             style={{
                 height: ITEM_HEIGHT,
                 width,
@@ -73,13 +78,13 @@ function AnimatedWheelItem({ item, index, scrollY, textColor, width }: {
             >
                 {item}
             </Text>
-        </Animated.View>
+        </RNAnimated.View>
     );
 }
 
 function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryColor, width = 60 }: WheelPickerProps) {
-    const flatListRef = useRef<Animated.FlatList>(null);
-    const scrollY = useRef(new Animated.Value(selectedIndex * ITEM_HEIGHT)).current;
+    const flatListRef = useRef(null as RNAnimated.FlatList<string> | null);
+    const scrollY = useRef(new RNAnimated.Value(selectedIndex * ITEM_HEIGHT)).current;
     const isUserScrolling = useRef(false);
     const lastSnappedIndex = useRef(selectedIndex);
 
@@ -111,7 +116,7 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
         isUserScrolling.current = true;
     }, []);
 
-    const onScroll = Animated.event(
+    const onScroll = RNAnimated.event(
         [{ nativeEvent: { contentOffset: { y: scrollY } } }],
         { useNativeDriver: true }
     );
@@ -133,7 +138,7 @@ function WheelPicker({ data, selectedIndex, onIndexChange, textColor, secondaryC
 
     return (
         <View style={{ height: WHEEL_HEIGHT, width, overflow: 'hidden' }}>
-            <Animated.FlatList
+            <RNAnimated.FlatList
                 ref={flatListRef}
                 data={data}
                 keyExtractor={keyExtractor}
@@ -182,6 +187,12 @@ export default function AddDrinkScreen() {
     const theme = useCaffeineStore(state => state.theme);
     const use24HourFormat = useCaffeineStore(state => state.use24HourFormat);
     const colors = Colors[theme];
+    const reduceMotion = useReduceMotion();
+
+    const addSlots = useMemo(() => {
+        let i = 0;
+        return { header: i++, presets: i++, more: i++, custom: i++ };
+    }, []);
 
     const [customMg, setCustomMg] = useState('');
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -272,6 +283,9 @@ export default function AddDrinkScreen() {
     };
 
     const showConfirmation = (name: string, mg: number) => {
+        if (FEATURES.UI_MOTION) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
+        }
         setPendingDrink({ name, mg });
         setSelectedDate(new Date());
         setIsCustomTime(false);
@@ -312,15 +326,18 @@ export default function AddDrinkScreen() {
         <View style={[styles.container, { backgroundColor: theme === 'dark' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)' }]}>
             <BlurView intensity={80} tint={theme === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
 
+            <FadeInSlot slotIndex={addSlots.header}>
             <View style={styles.header}>
                 <Text style={[styles.title, { color: colors.text }]}>Add Caffeine</Text>
-                <TouchableOpacity onPress={() => router.back()} style={[styles.closeButton, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
+                <PressableScale onPress={() => router.back()} style={[styles.closeButton, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]}>
                     <Ionicons name="close" size={24} color={colors.text} />
-                </TouchableOpacity>
+                </PressableScale>
             </View>
+            </FadeInSlot>
 
             <ScrollView contentContainerStyle={styles.content}>
 
+                <FadeInSlot slotIndex={addSlots.presets}>
                 <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Quick Presets</Text>
                 <View style={styles.grid}>
                     {PRESETS.map((preset) => (
@@ -332,16 +349,16 @@ export default function AddDrinkScreen() {
                         />
                     ))}
                 </View>
+                </FadeInSlot>
 
-                {/* More Drinks Dropdown */}
+                <FadeInSlot slotIndex={addSlots.more}>
                 <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>More Drinks</Text>
-                <TouchableOpacity
+                <PressableScale
                     style={[styles.dropdownBar, {
                         backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
                         borderColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
                     }]}
                     onPress={() => setMoreDrinksOpen(!moreDrinksOpen)}
-                    activeOpacity={0.7}
                 >
                     <Text style={[styles.dropdownBarText, { color: moreDrinksOpen ? colors.text : colors.textSecondary }]}>
                         {moreDrinksOpen ? 'Hide drinks' : 'Select a drink...'}
@@ -351,14 +368,14 @@ export default function AddDrinkScreen() {
                         size={20}
                         color={colors.textSecondary}
                     />
-                </TouchableOpacity>
+                </PressableScale>
                 {moreDrinksOpen && (
                     <View style={[styles.dropdownList, {
                         backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
                         borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                     }]}>
                         {MORE_DRINKS.map((drink, idx) => (
-                            <TouchableOpacity
+                            <PressableScale
                                 key={drink.name}
                                 style={[
                                     styles.dropdownItem,
@@ -371,15 +388,16 @@ export default function AddDrinkScreen() {
                                     setMoreDrinksOpen(false);
                                     showConfirmation(drink.name, drink.mg);
                                 }}
-                                activeOpacity={0.6}
                             >
                                 <Text style={[styles.dropdownItemName, { color: colors.text }]}>{drink.name}</Text>
                                 <Text style={[styles.dropdownItemMg, { color: colors.textSecondary }]}>{drink.mg}mg</Text>
-                            </TouchableOpacity>
+                            </PressableScale>
                         ))}
                     </View>
                 )}
+                </FadeInSlot>
 
+                <FadeInSlot slotIndex={addSlots.custom}>
                 <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Custom Amount</Text>
                 <View style={styles.customRow}>
                     <TextInput
@@ -400,6 +418,7 @@ export default function AddDrinkScreen() {
                         style={styles.addButton}
                     />
                 </View>
+                </FadeInSlot>
 
             </ScrollView>
 
@@ -415,7 +434,8 @@ export default function AddDrinkScreen() {
                     <Pressable style={StyleSheet.absoluteFill} onPress={handleCancel} />
 
                     {/* Card content — completely outside Pressable responder chain */}
-                    <View
+                    <Animated.View
+                        entering={FEATURES.UI_MOTION ? modalCardEntering(reduceMotion) : FadeIn.duration(1)}
                         style={[styles.modalCard, {
                             backgroundColor: theme === 'dark' ? '#1C1C1E' : '#F2F2F7',
                         }]}
@@ -434,16 +454,16 @@ export default function AddDrinkScreen() {
                         </Text>
                         <View style={styles.modalTimeRow}>
                             {/* Chip 1: Just Now */}
-                            <TouchableOpacity
+                            <PressableScale
                                 style={[
                                     styles.modalTimeChip,
                                     {
                                         backgroundColor: !isCustomTime
                                             ? colors.primary
-                                            : 'rgba(255,255,255,0.1)',
+                                            : theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
                                         borderColor: !isCustomTime
                                             ? colors.primary
-                                            : 'rgba(255,255,255,0.1)',
+                                            : theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
                                     },
                                 ]}
                                 onPress={() => {
@@ -463,19 +483,19 @@ export default function AddDrinkScreen() {
                                 >
                                     Just Now
                                 </Text>
-                            </TouchableOpacity>
+                            </PressableScale>
 
                             {/* Chip 2: Custom Time */}
-                            <TouchableOpacity
+                            <PressableScale
                                 style={[
                                     styles.modalTimeChip,
                                     {
                                         backgroundColor: isCustomTime
                                             ? colors.primary
-                                            : 'rgba(255,255,255,0.1)',
+                                            : theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
                                         borderColor: isCustomTime
                                             ? colors.primary
-                                            : 'rgba(255,255,255,0.1)',
+                                            : theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
                                     },
                                 ]}
                                 onPress={() => {
@@ -494,7 +514,7 @@ export default function AddDrinkScreen() {
                                 >
                                     {isCustomTime ? formatTime(selectedDate) : 'Pick Time'}
                                 </Text>
-                            </TouchableOpacity>
+                            </PressableScale>
                         </View>
 
                         {/* Scroll Wheel Time Picker */}
@@ -543,24 +563,24 @@ export default function AddDrinkScreen() {
 
                         {/* Action Buttons */}
                         <View style={styles.modalActions}>
-                            <TouchableOpacity
+                            <PressableScale
                                 style={[styles.modalButton, styles.cancelButton, {
                                     backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                                 }]}
                                 onPress={handleCancel}
                             >
                                 <Text style={[styles.modalButtonText, { color: colors.textSecondary }]}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
+                            </PressableScale>
+                            <PressableScale
                                 style={[styles.modalButton, styles.confirmButton, {
                                     backgroundColor: colors.primary,
                                 }]}
                                 onPress={handleConfirm}
                             >
                                 <Text style={[styles.modalButtonText, { color: '#1C1C1E', fontWeight: '800' }]}>Confirm Add</Text>
-                            </TouchableOpacity>
+                            </PressableScale>
                         </View>
-                    </View>
+                    </Animated.View>
                 </View>
             </Modal>
 

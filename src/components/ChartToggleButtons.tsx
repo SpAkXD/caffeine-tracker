@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { useCaffeineStore } from '../store/useCaffeineStore';
+import { PressableScale } from './PressableScale';
 
 interface ChartToggleButtonsProps {
     showCaffeine: boolean;
@@ -25,7 +26,7 @@ export const ChartToggleButtons: React.FC<ChartToggleButtonsProps> = ({
 
     return (
         <View style={styles.container}>
-            <TouchableOpacity
+            <PressableScale
                 style={[
                     styles.toggleButton,
                     showCaffeine
@@ -33,15 +34,14 @@ export const ChartToggleButtons: React.FC<ChartToggleButtonsProps> = ({
                         : { backgroundColor: 'transparent', borderColor: `${colors.border}40` },
                 ]}
                 onPress={onToggleCaffeine}
-                activeOpacity={0.7}
             >
                 <View style={[styles.colorDot, { backgroundColor: colors.primary, opacity: showCaffeine ? 1 : 0.4 }]} />
                 <Text style={[styles.buttonText, { color: showCaffeine ? colors.primary : colors.textSecondary }]}>
                     Caffeine
                 </Text>
-            </TouchableOpacity>
+            </PressableScale>
 
-            <TouchableOpacity
+            <PressableScale
                 style={[
                     styles.toggleButton,
                     showAlertness
@@ -49,15 +49,14 @@ export const ChartToggleButtons: React.FC<ChartToggleButtonsProps> = ({
                         : { backgroundColor: 'transparent', borderColor: `${colors.border}40` },
                 ]}
                 onPress={onToggleAlertness}
-                activeOpacity={0.7}
             >
                 <View style={[styles.colorDot, { backgroundColor: '#FF9500', opacity: showAlertness ? 1 : 0.4 }]} />
                 <Text style={[styles.buttonText, { color: showAlertness ? '#FF9500' : colors.textSecondary }]}>
                     Alertness
                 </Text>
-            </TouchableOpacity>
+            </PressableScale>
 
-            <TouchableOpacity
+            <PressableScale
                 style={[
                     styles.toggleButton,
                     showThreshold
@@ -65,13 +64,12 @@ export const ChartToggleButtons: React.FC<ChartToggleButtonsProps> = ({
                         : { backgroundColor: 'transparent', borderColor: `${colors.border}40` },
                 ]}
                 onPress={onToggleThreshold}
-                activeOpacity={0.7}
             >
                 <View style={[styles.colorDot, { backgroundColor: colors.accent, opacity: showThreshold ? 1 : 0.4 }]} />
                 <Text style={[styles.buttonText, { color: showThreshold ? colors.accent : colors.textSecondary }]}>
                     Threshold
                 </Text>
-            </TouchableOpacity>
+            </PressableScale>
         </View>
     );
 };

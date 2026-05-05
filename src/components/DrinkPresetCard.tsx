@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { GlassmorphicCard } from './GlassmorphicCard';
+import { View, Text, StyleSheet } from 'react-native';
+import { PressableScale } from './PressableScale';
 import { useCaffeineStore } from '../store/useCaffeineStore';
 import { Colors } from '../constants/Colors';
 
@@ -15,15 +15,20 @@ export const DrinkPresetCard: React.FC<DrinkPresetCardProps> = ({ name, mg, onPr
     const colors = Colors[theme];
 
     return (
-        <Pressable onPress={onPress} style={styles.pressable}>
-            <View style={[styles.card, {
-                backgroundColor: theme === 'dark' ? 'rgba(30, 30, 30, 0.6)' : 'rgba(255, 255, 255, 0.6)',
-                borderColor: colors.border,
-            }]}>
+        <PressableScale onPress={onPress} style={styles.pressable}>
+            <View
+                style={[
+                    styles.card,
+                    {
+                        backgroundColor: theme === 'dark' ? 'rgba(30, 30, 30, 0.6)' : 'rgba(255, 255, 255, 0.6)',
+                        borderColor: colors.border,
+                    },
+                ]}
+            >
                 <Text style={[styles.name, { color: colors.text }]}>{name}</Text>
                 <Text style={[styles.mg, { color: colors.primary }]}>{mg} mg</Text>
             </View>
-        </Pressable>
+        </PressableScale>
     );
 };
 

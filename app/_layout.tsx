@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
-import { LogBox } from 'react-native';
+import { LogBox, Platform } from 'react-native';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { Colors } from '../src/constants/Colors';
 import '../src/services/backgroundTask'; // Register background task definitions (renamed to .tsx for widget JSX)
@@ -75,6 +75,7 @@ export default function RootLayout() {
               presentation: 'modal',
               title: 'Add Drink',
               headerShown: false,
+              animation: Platform.OS === 'android' ? 'fade_from_bottom' : 'slide_from_bottom',
             }}
           />
           <Stack.Screen

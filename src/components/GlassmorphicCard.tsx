@@ -19,16 +19,30 @@ export const GlassmorphicCard: React.FC<GlassmorphicCardProps> = ({
     const colors = Colors[theme];
     // 'default', 'light', 'dark', 'regular', 'prominent', 'extraLight'
     const tint = theme === 'dark' ? 'dark' : 'light';
+    const lightShadow =
+        theme === 'light' && Platform.OS === 'ios'
+            ? {
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 14,
+              }
+            : {};
+    const lightElevation = theme === 'light' && Platform.OS === 'android' ? { elevation: 4 } : {};
 
     return (
-        <View style={[
-            styles.container,
-            {
-                backgroundColor: theme === 'dark' ? 'rgba(30, 30, 30, 0.6)' : 'rgba(255, 255, 255, 0.6)',
-                borderColor: colors.border
-            },
-            style
-        ]}>
+        <View
+            style={[
+                styles.container,
+                {
+                    backgroundColor: theme === 'dark' ? 'rgba(30, 30, 30, 0.6)' : 'rgba(255, 255, 255, 0.6)',
+                    borderColor: colors.border,
+                },
+                lightShadow,
+                lightElevation,
+                style,
+            ]}
+        >
             <BlurView intensity={intensity} tint={tint} style={StyleSheet.absoluteFill} />
             <View style={styles.content}>
                 {children}

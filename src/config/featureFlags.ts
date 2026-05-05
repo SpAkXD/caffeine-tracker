@@ -33,6 +33,7 @@ export const FEATURES = FLAGS as {
     HOME_WIDGET: boolean;
     BACKGROUND_NOTIFICATIONS: boolean;
     BACKGROUND_WIDGET_REFRESH: boolean;
+    UI_MOTION: boolean;
 };
 
 export type FeatureName = keyof typeof FEATURES;

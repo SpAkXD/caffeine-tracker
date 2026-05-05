@@ -76,5 +76,9 @@ module.exports = {
 
         /** Background widget refresh (tied to background fetch task) */
         BACKGROUND_WIDGET_REFRESH: true,
+
+        // ── UX / motion ───────────────────────────────────────────────────
+        /** Staggered entrances, PressableScale, modal spring, history bar layout */
+        UI_MOTION: true,
     }
 };

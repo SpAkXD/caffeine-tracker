@@ -1,5 +1,10 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
+import { Modal, Text, StyleSheet, Pressable } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { PressableScale } from './PressableScale';
+import { FEATURES } from '../config/featureFlags';
+import { useReduceMotion } from '../hooks/useReduceMotion';
+import { modalCardEntering } from '../constants/motion';
 
 interface InfoPopupModalProps {
     visible: boolean;
@@ -14,6 +19,9 @@ export const InfoPopupModal: React.FC<InfoPopupModalProps> = ({
     description,
     onClose,
 }) => {
+    const reduceMotion = useReduceMotion();
+    const entering = FEATURES.UI_MOTION ? modalCardEntering(reduceMotion) : FadeIn.duration(1);
+
     return (
         <Modal
             animationType="fade"
@@ -22,12 +30,14 @@ export const InfoPopupModal: React.FC<InfoPopupModalProps> = ({
             onRequestClose={onClose}
         >
             <Pressable style={styles.overlay} onPress={onClose}>
-                <Pressable style={styles.card} onPress={() => { }}>
-                    <Text style={styles.title}>{title}</Text>
-                    <Text style={styles.description}>{description}</Text>
-                    <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                        <Text style={styles.closeText}>Close</Text>
-                    </TouchableOpacity>
+                <Pressable style={{ width: '100%', maxWidth: 480 }} onPress={() => { }}>
+                    <Animated.View entering={entering} style={styles.card}>
+                        <Text style={styles.title}>{title}</Text>
+                        <Text style={styles.description}>{description}</Text>
+                        <PressableScale style={styles.closeButton} onPress={onClose}>
+                            <Text style={styles.closeText}>Close</Text>
+                        </PressableScale>
+                    </Animated.View>
                 </Pressable>
             </Pressable>
         </Modal>

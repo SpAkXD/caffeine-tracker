@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, ScrollView, Switch, Linking, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Alert, ScrollView, Switch, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import Constants from 'expo-constants';
@@ -15,6 +15,7 @@ import {
 } from '../src/services/notificationService';
 import { openStoreListing } from '../src/services/storeReview';
 import { WidgetPreview } from '../src/components/WidgetPreview';
+import { PressableScale } from '../src/components/PressableScale';
 
 import { FEATURES } from '../src/config/featureFlags';
 import { InfoPopupModal } from '../src/components/InfoPopupModal';
@@ -193,7 +194,7 @@ export default function SettingsScreen() {
                                 </Text>
                                 <View style={styles.frequencyRow}>
                                     {([1, 3, 6] as const).map((freq) => (
-                                        <TouchableOpacity
+                                        <PressableScale
                                             key={freq}
                                             style={[
                                                 styles.frequencyOption,
@@ -217,7 +218,7 @@ export default function SettingsScreen() {
                                             >
                                                 {freq}h
                                             </Text>
-                                        </TouchableOpacity>
+                                        </PressableScale>
                                     ))}
                                 </View>
                                 <Text style={[styles.frequencyHint, { color: colors.primary }]}>
@@ -234,9 +235,9 @@ export default function SettingsScreen() {
                         <View style={styles.labelRow}>
                             <Text style={[styles.label, { color: colors.primary }]}>Your Weight</Text>
                             {FEATURES.INFO_POPUPS && (
-                                <TouchableOpacity onPress={() => setInfoPopup(INFO_DESCRIPTIONS.weight)}>
+                                <PressableScale onPress={() => setInfoPopup(INFO_DESCRIPTIONS.weight)}>
                                     <Ionicons name="information-circle-outline" size={22} color={colors.primary} />
-                                </TouchableOpacity>
+                                </PressableScale>
                             )}
                         </View>
                         <Text style={[styles.value, { color: colors.text }]}>{Math.round(localWeight)} kg</Text>
@@ -272,9 +273,9 @@ export default function SettingsScreen() {
                         <View style={styles.labelRow}>
                             <Text style={[styles.label, { color: colors.primary }]}>Base Half-Life (Hours)</Text>
                             {FEATURES.INFO_POPUPS && (
-                                <TouchableOpacity onPress={() => setInfoPopup(INFO_DESCRIPTIONS.halfLife)}>
+                                <PressableScale onPress={() => setInfoPopup(INFO_DESCRIPTIONS.halfLife)}>
                                     <Ionicons name="information-circle-outline" size={22} color={colors.primary} />
-                                </TouchableOpacity>
+                                </PressableScale>
                             )}
                         </View>
                         <Text style={[styles.value, { color: colors.text }]}>{localHalfLife.toFixed(1)} hrs</Text>
@@ -302,9 +303,9 @@ export default function SettingsScreen() {
                         <View style={styles.labelRow}>
                             <Text style={[styles.label, { color: colors.primary }]}>Sleep Threshold (mg)</Text>
                             {FEATURES.INFO_POPUPS && (
-                                <TouchableOpacity onPress={() => setInfoPopup(INFO_DESCRIPTIONS.threshold)}>
+                                <PressableScale onPress={() => setInfoPopup(INFO_DESCRIPTIONS.threshold)}>
                                     <Ionicons name="information-circle-outline" size={22} color={colors.primary} />
-                                </TouchableOpacity>
+                                </PressableScale>
                             )}
                         </View>
                         <Text style={[styles.value, { color: colors.text }]}>{Math.round(localThreshold)} mg</Text>
@@ -329,7 +330,7 @@ export default function SettingsScreen() {
 
                 {FEATURES.STORE_REVIEW && (
                     <GlassmorphicCard style={styles.card}>
-                        <TouchableOpacity
+                        <PressableScale
                             style={styles.rateRow}
                             onPress={async () => {
                                 try {
@@ -338,14 +339,13 @@ export default function SettingsScreen() {
                                     Alert.alert('Store', 'Could not open the store. Try again later.');
                                 }
                             }}
-                            activeOpacity={0.7}
                         >
                             <View style={styles.rateRowLeft}>
                                 <Ionicons name="star-outline" size={24} color={colors.primary} />
                                 <Text style={[styles.rateTitle, { color: colors.text }]}>Rate Caffeine Tracker</Text>
                             </View>
                             <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
-                        </TouchableOpacity>
+                        </PressableScale>
                         <Text style={[styles.rateHint, { color: colors.textSecondary }]}>
                             Opens the Play Store or App Store listing
                         </Text>
@@ -373,7 +373,7 @@ export default function SettingsScreen() {
                 )}
 
                 {/* DEV: Toggle Pro Mode */}
-                <TouchableOpacity
+                <PressableScale
                     onPress={toggleProDebug}
                     style={[
                         styles.devToggle,
@@ -398,7 +398,7 @@ export default function SettingsScreen() {
                     >
                         DEV: Toggle Pro Mode {isProDebug ? '(ON)' : '(OFF)'}
                     </Text>
-                </TouchableOpacity>
+                </PressableScale>
 
                 {/* DEV: Send Test Notification (5s) */}
                 {isProDebug && (

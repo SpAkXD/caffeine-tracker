@@ -1,9 +1,39 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import Animated, { Layout } from 'react-native-reanimated';
 import { useCaffeineStore } from '../store/useCaffeineStore';
 import { Colors } from '../constants/Colors';
 import { GlassmorphicCard } from './GlassmorphicCard';
 import { format, isToday, isYesterday } from 'date-fns';
+import { FEATURES } from '../config/featureFlags';
+
+function HistoryDayBar({
+    barHeight,
+    backgroundColor,
+    opacity,
+}: {
+    barHeight: number;
+    backgroundColor: string;
+    opacity: number;
+}) {
+    const barStyle = [
+        styles.bar,
+        {
+            height: barHeight,
+            backgroundColor,
+            opacity,
+        },
+    ];
+    if (FEATURES.UI_MOTION) {
+        return (
+            <Animated.View
+                layout={Layout.springify().damping(16).stiffness(200)}
+                style={barStyle}
+            />
+        );
+    }
+    return <View style={barStyle} />;
+}
 
 export const HistoryCard: React.FC = () => {
     const getWeeklyHistory = useCaffeineStore(state => state.getWeeklyHistory);
@@ -27,7 +57,7 @@ export const HistoryCard: React.FC = () => {
             <Text style={[styles.title, { color: colors.text }]}>Last 3 Days</Text>
 
             <View style={styles.barsContainer}>
-                {history.map((day, index) => {
+                {history.map((day) => {
                     const barHeight = day.totalMg > 0 ? (day.totalMg / maxMg) * 80 : 4;
                     const isCurrentDay = isToday(new Date(day.date));
 
@@ -37,15 +67,10 @@ export const HistoryCard: React.FC = () => {
                                 {day.totalMg > 0 ? `${Math.round(day.totalMg)}` : '-'}
                             </Text>
                             <View style={styles.barWrapper}>
-                                <View
-                                    style={[
-                                        styles.bar,
-                                        {
-                                            height: barHeight,
-                                            backgroundColor: isCurrentDay ? colors.primary : colors.accent,
-                                            opacity: isCurrentDay ? 1 : 0.6,
-                                        }
-                                    ]}
+                                <HistoryDayBar
+                                    barHeight={barHeight}
+                                    backgroundColor={isCurrentDay ? colors.primary : colors.accent}
+                                    opacity={isCurrentDay ? 1 : 0.6}
                                 />
                             </View>
                             <Text style={[
