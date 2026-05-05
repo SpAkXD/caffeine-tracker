@@ -1,22 +1,30 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, AppState } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, AppState, LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Line, Text as SvgText, Defs, LinearGradient as SvgLinearGradient, Stop, Circle, Rect } from 'react-native-svg';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { subDays, startOfDay, format } from 'date-fns';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { Colors } from '../src/constants/Colors';
 import { GlassmorphicCard } from '../src/components/GlassmorphicCard';
+import { FadeInSlot } from '../src/components/FadeInSlot';
+import { PressableScale } from '../src/components/PressableScale';
 import { calculateStackedCaffeine, calculateAlertness } from '../src/utils/math';
-import { format } from 'date-fns';
+import { FEATURES } from '../src/config/featureFlags';
+import { useReduceMotion } from '../src/hooks/useReduceMotion';
+import { ROW_STAGGER_MS } from '../src/constants/motion';
 
-// Mini chart constants
 const CHART_W = 340;
 const CHART_H = 180;
 const PAD = { top: 20, right: 15, bottom: 30, left: 40 };
 const INNER_W = CHART_W - PAD.left - PAD.right;
 const INNER_H = CHART_H - PAD.top - PAD.bottom;
+
+const STATS_SLOTS = { header: 0, hero: 1, metrics: 2, chart: 3, table: 4 } as const;
+const HOUR_ROW_ANIM_CAP = 12;
 
 interface HourlyEntry {
     time: string;
@@ -25,11 +33,16 @@ interface HourlyEntry {
     statusColor: string;
     isPast: boolean;
     isNow: boolean;
+    hourOffset: number;
 }
 
-/**
- * Creates smooth Bezier curve path from points
- */
+interface DayRollup {
+    date: string;
+    weekday: string;
+    totalMg: number;
+    doseCount: number;
+}
+
 function createSmoothPath(points: { x: number; y: number }[]): string {
     if (points.length === 0) return '';
     if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
@@ -50,19 +63,59 @@ function createSmoothPath(points: { x: number; y: number }[]): string {
     return path;
 }
 
+type BentoIcon = React.ComponentProps<typeof Ionicons>['name'];
+
+function BentoTile({
+    icon,
+    label,
+    value,
+    hint,
+    colors,
+    theme,
+}: {
+    icon: BentoIcon;
+    label: string;
+    value: string;
+    hint?: string;
+    colors: (typeof Colors)['light'];
+    theme: 'light' | 'dark';
+}) {
+    const surface =
+        theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
+    return (
+        <View style={[styles.bentoTile, { backgroundColor: surface, borderColor: colors.border }]}>
+            <View style={styles.bentoTileTop}>
+                <Ionicons name={icon} size={18} color={colors.primary} />
+                <Text style={[styles.bentoValue, { color: colors.text }]} numberOfLines={1}>
+                    {value}
+                </Text>
+            </View>
+            <Text style={[styles.bentoLabel, { color: colors.textSecondary }]} numberOfLines={2}>
+                {label}
+            </Text>
+            {hint ? (
+                <Text style={[styles.bentoHint, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {hint}
+                </Text>
+            ) : null}
+        </View>
+    );
+}
+
 export default function DetailedStatsScreen() {
     const router = useRouter();
+    const reduceMotion = useReduceMotion();
     const theme = useCaffeineStore(state => state.theme);
     const colors = Colors[theme];
     const doses = useCaffeineStore(state => state.doses);
     const sleepThreshold = useCaffeineStore(state => state.sleepThresholdMg);
-    const bedtimeHour = useCaffeineStore(state => state.bedtimeHour);
     const weightKg = useCaffeineStore(state => state.weightKg);
     const sleepQuality = useCaffeineStore(state => state.sleepQuality);
+    const use24HourFormat = useCaffeineStore(state => state.use24HourFormat);
     const getEffectiveHalfLife = useCaffeineStore(state => state.getEffectiveHalfLife);
-    const getWeeklyHistory = useCaffeineStore(state => state.getWeeklyHistory);
 
     const [currentTime, setCurrentTime] = useState(Date.now());
+    const [hourlyFilter, setHourlyFilter] = useState<'all' | 'past' | 'future'>('all');
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', nextAppState => {
@@ -76,25 +129,23 @@ export default function DetailedStatsScreen() {
     const effectiveHalfLife = getEffectiveHalfLife();
     const now = currentTime;
 
-    // Current caffeine level - from store's single source of truth
     const currentLevel = useCaffeineStore(state => state.currentLevel);
     const storeClearanceTime = useCaffeineStore(state => state.clearanceTime);
     const qualityMultiplier = sleepQuality === 'great' ? 1.0 : sleepQuality === 'average' ? 0.8 : 0.6;
 
-    // --- Chart Data: 12-hour forecast with dynamic lookback ---
+    const timeFmt = use24HourFormat ? 'HH:mm' : 'h:mm a';
+
     const chartData = useMemo(() => {
-        // Dynamic start: cover oldest dose from today or default to 2h ago
         const todayStart = new Date(now);
         todayStart.setHours(0, 0, 0, 0);
         const todayDoses = doses.filter(d => d.timestamp >= todayStart.getTime());
-        const defaultStart = now - 2 * 60 * 60 * 1000; // 2h ago
+        const defaultStart = now - 2 * 60 * 60 * 1000;
         let startTime = defaultStart;
         if (todayDoses.length > 0) {
             const oldestDoseTime = Math.min(...todayDoses.map(d => d.timestamp));
             startTime = Math.min(defaultStart, oldestDoseTime - 1 * 60 * 60 * 1000);
         }
-        const endTime = now + 12 * 60 * 60 * 1000;  // 12h future
-        // Scale points dynamically: ~10 min per point
+        const endTime = now + 12 * 60 * 60 * 1000;
         const totalDuration = endTime - startTime;
         const totalPoints = Math.max(84, Math.round(totalDuration / (10 * 60 * 1000)));
         const step = totalDuration / totalPoints;
@@ -116,12 +167,11 @@ export default function DetailedStatsScreen() {
         const svgPoints = points.map((p, i) => ({ x: getX(i), y: getY(p.level) }));
         const linePath = createSmoothPath(svgPoints);
 
-        // Area fill
-        const areaPath = linePath +
+        const areaPath =
+            linePath +
             ` L ${getX(totalPoints)} ${PAD.top + INNER_H}` +
             ` L ${getX(0)} ${PAD.top + INNER_H} Z`;
 
-        // X-axis: hourly labels (numbers only, no am/pm)
         const hourLabels: { x: number; label: string }[] = [];
         for (let i = 0; i <= totalPoints; i++) {
             const date = new Date(points[i].t);
@@ -132,7 +182,6 @@ export default function DetailedStatsScreen() {
             }
         }
 
-        // Night zone rectangles (6PM-6AM = darker overlay)
         const nightZones: { x: number; width: number }[] = [];
         let nightStart: number | null = null;
         for (let i = 0; i <= totalPoints; i++) {
@@ -145,28 +194,40 @@ export default function DetailedStatsScreen() {
                 nightStart = null;
             }
         }
-        // Close any open night zone at chart end
         if (nightStart !== null) {
             nightZones.push({ x: nightStart, width: getX(totalPoints) - nightStart });
         }
 
-        // "Now" position
         let nowIdx = 0;
         let minDiff = Infinity;
         points.forEach((p, i) => {
             const d = Math.abs(p.t - now);
-            if (d < minDiff) { minDiff = d; nowIdx = i; }
+            if (d < minDiff) {
+                minDiff = d;
+                nowIdx = i;
+            }
         });
         const nowX = getX(nowIdx);
         const nowY = getY(points[nowIdx].level);
 
-        // Threshold Y
         const thresholdY = getY(sleepThreshold);
 
-        return { linePath, areaPath, hourLabels, nowX, nowY, thresholdY, maxScale, nightZones };
-    }, [doses, now, effectiveHalfLife, sleepThreshold]);
+        const nightZoneFill =
+            theme === 'dark' ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.055)';
 
-    // --- Hourly Breakdown Table: past 10h to future 12h ---
+        return {
+            linePath,
+            areaPath,
+            hourLabels,
+            nowX,
+            nowY,
+            thresholdY,
+            maxScale,
+            nightZones,
+            nightZoneFill,
+        };
+    }, [doses, now, effectiveHalfLife, sleepThreshold, theme]);
+
     const hourlyBreakdown = useMemo(() => {
         const entries: HourlyEntry[] = [];
         for (let h = -10; h <= 12; h++) {
@@ -176,14 +237,26 @@ export default function DetailedStatsScreen() {
 
             let status = 'Low';
             let statusColor = '#34C759';
-            if (rounded > 200) { status = 'Very High'; statusColor = '#FF3B30'; }
-            else if (rounded > 100) { status = 'High'; statusColor = '#FF9500'; }
-            else if (rounded > sleepThreshold) { status = 'Moderate'; statusColor = '#FFD60A'; }
-            else if (rounded > 20) { status = 'Descending'; statusColor = '#5856D6'; }
+            if (rounded > 200) {
+                status = 'Very High';
+                statusColor = '#FF3B30';
+            } else if (rounded > 100) {
+                status = 'High';
+                statusColor = '#FF9500';
+            } else if (rounded > sleepThreshold) {
+                status = 'Moderate';
+                statusColor = '#FFD60A';
+            } else if (rounded > 20) {
+                status = 'Descending';
+                statusColor = '#5856D6';
+            }
 
-            // Check crash risk
             if (h > -10) {
-                const prevLevel = calculateStackedCaffeine(doses, now + (h - 1) * 60 * 60 * 1000, effectiveHalfLife);
+                const prevLevel = calculateStackedCaffeine(
+                    doses,
+                    now + (h - 1) * 60 * 60 * 1000,
+                    effectiveHalfLife
+                );
                 if (prevLevel > 80 && rounded < 50) {
                     status = 'Crash Risk';
                     statusColor = '#FF3B30';
@@ -191,196 +264,506 @@ export default function DetailedStatsScreen() {
             }
 
             entries.push({
-                time: format(new Date(t), 'h:mm a'),
+                time: format(new Date(t), timeFmt),
                 level: rounded,
                 status,
                 statusColor,
                 isPast: h < 0,
                 isNow: h === 0,
+                hourOffset: h,
             });
         }
         return entries;
-    }, [doses, now, effectiveHalfLife, sleepThreshold]);
+    }, [doses, now, effectiveHalfLife, sleepThreshold, timeFmt]);
 
-    // --- Summary Stats ---
+    const sevenDays: DayRollup[] = useMemo(() => {
+        const out: DayRollup[] = [];
+        for (let i = 6; i >= 0; i--) {
+            const day = startOfDay(subDays(new Date(now), i));
+            const ds = day.getTime();
+            const de = ds + 86400000;
+            const dayDoses = doses.filter(d => d.timestamp >= ds && d.timestamp < de);
+            out.push({
+                date: format(day, 'yyyy-MM-dd'),
+                weekday: format(day, 'EEE'),
+                totalMg: dayDoses.reduce((s, d) => s + d.mg, 0),
+                doseCount: dayDoses.length,
+            });
+        }
+        return out;
+    }, [doses, now]);
+
     let peakAlertness = -Infinity;
     let peakTime = now;
     for (let t = now; t <= now + 6 * 60 * 60 * 1000; t += 5 * 60 * 1000) {
         const alertness = calculateAlertness(doses, t, effectiveHalfLife, undefined, qualityMultiplier);
-        if (alertness > peakAlertness) { peakAlertness = alertness; peakTime = t; }
+        if (alertness > peakAlertness) {
+            peakAlertness = alertness;
+            peakTime = t;
+        }
     }
 
-    // Use store's shared clearance time (single source of truth)
     const isClear = storeClearanceTime === null || currentLevel <= sleepThreshold;
     const clearanceTime = storeClearanceTime ?? now;
 
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
     const todayDoses = doses.filter(d => d.timestamp >= todayStart.getTime());
+    const sortedToday = [...todayDoses].sort((a, b) => a.timestamp - b.timestamp);
+    const firstDoseToday = sortedToday[0];
     const totalToday = todayDoses.reduce((sum, d) => sum + d.mg, 0);
+    const todayRollup = sevenDays[sevenDays.length - 1];
 
-    // 3-day average daily caffeine (skip days with no intake)
-    const weeklyHistory = getWeeklyHistory();
-    const daysWithData = weeklyHistory.filter(d => d.totalMg > 0);
-    const avgDailyMg = daysWithData.length > 0
-        ? daysWithData.reduce((sum, d) => sum + d.totalMg, 0) / daysWithData.length
-        : 0;
-
-    // Peak caffeine level today: max instantaneous level after each dose in todayDoses
     let peakCaffeineToday = 0;
     for (const dose of todayDoses) {
         const levelAtDose = calculateStackedCaffeine(doses, dose.timestamp, effectiveHalfLife);
         if (levelAtDose > peakCaffeineToday) peakCaffeineToday = levelAtDose;
     }
-    // Also check current level in case doses are still rising
     if (currentLevel > peakCaffeineToday) peakCaffeineToday = currentLevel;
 
-    const statCards = [
-        { icon: '☕', label: `${Math.round(currentLevel)} mg`, sub: `${todayDoses.length} drink${todayDoses.length !== 1 ? 's' : ''} today (${Math.round(totalToday)} mg)`, color: '#FF6B35' },
-        { icon: '⚡', label: peakTime <= now + 5 * 60 * 1000 ? 'Right now' : format(new Date(peakTime), 'h:mm a'), sub: 'Peak energy', color: '#FF9500' },
-        { icon: '🌙', label: isClear ? 'Clear' : format(new Date(clearanceTime), 'h:mm a'), sub: `Below ${sleepThreshold}mg`, color: '#5856D6' },
-        { icon: '🔬', label: `${effectiveHalfLife.toFixed(1)}h`, sub: `Half-life (${weightKg}kg)`, color: '#34C759' },
-        { icon: '📊', label: avgDailyMg > 0 ? `${Math.round(avgDailyMg)} mg` : '—', sub: '3-day daily avg', color: '#30B0C7' },
-        { icon: '📈', label: peakCaffeineToday > 0 ? `${Math.round(peakCaffeineToday)} mg` : '—', sub: 'Peak caffeine today', color: '#FF6B35' },
-    ];
+    const sum7Mg = sevenDays.reduce((s, d) => s + d.totalMg, 0);
+    const totalDoses7 = sevenDays.reduce((s, d) => s + d.doseCount, 0);
+    const daysWithIntake = sevenDays.filter(d => d.doseCount > 0);
+    const avgMgPerDayActive =
+        daysWithIntake.length > 0 ? sum7Mg / daysWithIntake.length : 0;
+    const avgMgPerDrink7 = totalDoses7 > 0 ? sum7Mg / totalDoses7 : 0;
+
+    let bestDay: DayRollup | null = null;
+    let quietDay: DayRollup | null = null;
+    if (daysWithIntake.length > 0) {
+        bestDay = daysWithIntake.reduce((a, b) => (a.totalMg >= b.totalMg ? a : b));
+        quietDay = daysWithIntake.reduce((a, b) => (a.totalMg <= b.totalMg ? a : b));
+    }
+
+    let vsAvgCopy: string | null = null;
+    if (avgMgPerDayActive > 0 && todayRollup.doseCount > 0) {
+        const diffPct = Math.round(
+            ((todayRollup.totalMg - avgMgPerDayActive) / avgMgPerDayActive) * 100
+        );
+        if (diffPct === 0) vsAvgCopy = 'On your 7-day average';
+        else if (diffPct > 0) vsAvgCopy = `${diffPct}% above 7-day average`;
+        else vsAvgCopy = `${Math.abs(diffPct)}% below 7-day average`;
+    }
+
+    const weekMaxMg = Math.max(...sevenDays.map(d => d.totalMg), 1);
+
+    const visibleHourly =
+        hourlyFilter === 'all'
+            ? hourlyBreakdown
+            : hourlyFilter === 'past'
+              ? hourlyBreakdown.filter(e => e.isPast)
+              : hourlyBreakdown.filter(e => !e.isPast);
+
+    const tableBorder = colors.border;
+    const zebra = theme === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.035)';
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <LinearGradient
-                colors={theme === 'dark' ? ['#050505', '#1a1a1a'] : ['#F2F2F7', '#FFFFFF']}
+                colors={theme === 'dark' ? ['#050505', '#1c1c1e', '#151515'] : ['#EFEFF4', '#F9F9FB', '#FFFFFF']}
                 style={StyleSheet.absoluteFill}
             />
             <SafeAreaView style={styles.safeArea}>
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        onPress={() => router.back()}
-                        style={[styles.backButton, { backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}
-                    >
-                        <Ionicons name="arrow-back" size={24} color={colors.text} />
-                    </TouchableOpacity>
-                    <Text style={[styles.title, { color: colors.text }]}>Detailed Statistics</Text>
-                    <View style={{ width: 40 }} />
-                </View>
+                <FadeInSlot slotIndex={STATS_SLOTS.header} variant="fast">
+                    <View style={styles.header}>
+                        <PressableScale
+                            onPress={() => router.back()}
+                            style={[
+                                styles.backButton,
+                                {
+                                    backgroundColor:
+                                        theme === 'dark'
+                                            ? 'rgba(255,255,255,0.1)'
+                                            : 'rgba(0,0,0,0.05)',
+                                },
+                            ]}
+                        >
+                            <Ionicons name="arrow-back" size={24} color={colors.text} />
+                        </PressableScale>
+                        <Text style={[styles.title, { color: colors.text }]}>Detailed Statistics</Text>
+                        <View style={{ width: 40 }} />
+                    </View>
+                </FadeInSlot>
 
                 <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                    {/* Quick stat row */}
-                    <View style={styles.statRow}>
-                        {statCards.map((s, i) => (
-                            <GlassmorphicCard key={i} style={styles.miniCard} intensity={10}>
-                                <Text style={styles.miniIcon}>{s.icon}</Text>
-                                <Text style={[styles.miniLabel, { color: s.color }]}>{s.label}</Text>
-                                <Text style={[styles.miniSub, { color: colors.textSecondary }]}>{s.sub}</Text>
-                            </GlassmorphicCard>
-                        ))}
-                    </View>
-
-                    {/* Detailed Chart */}
-                    <GlassmorphicCard style={styles.chartCard} intensity={12}>
-                        <Text style={[styles.chartTitle, { color: colors.text }]}>12-Hour Forecast</Text>
-                        <Svg width={CHART_W} height={CHART_H}>
-                            <Defs>
-                                <SvgLinearGradient id="detailGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <Stop offset="0" stopColor={colors.primary} stopOpacity={0.25} />
-                                    <Stop offset="1" stopColor={colors.primary} stopOpacity={0} />
-                                </SvgLinearGradient>
-                            </Defs>
-
-                            {/* Night zone overlays (behind everything) */}
-                            {chartData.nightZones.map((zone, i) => (
-                                <Rect
-                                    key={`night-${i}`}
-                                    x={zone.x}
-                                    y={PAD.top}
-                                    width={zone.width}
-                                    height={INNER_H}
-                                    fill="rgba(0,0,0,0.25)"
-                                    rx={4}
-                                />
-                            ))}
-
-                            {/* Area fill */}
-                            <Path d={chartData.areaPath} fill="url(#detailGrad)" />
-
-                            {/* Caffeine line */}
-                            <Path
-                                d={chartData.linePath}
-                                stroke={colors.primary}
-                                strokeWidth={2.5}
-                                fill="none"
-                                strokeLinecap="round"
-                            />
-
-                            {/* Threshold line */}
-                            <Line
-                                x1={PAD.left} y1={chartData.thresholdY}
-                                x2={CHART_W - PAD.right} y2={chartData.thresholdY}
-                                stroke={colors.accent} strokeWidth={1} strokeDasharray="5,3" strokeOpacity={0.5}
-                            />
-                            <SvgText
-                                x={CHART_W - PAD.right - 2} y={chartData.thresholdY - 4}
-                                fill={colors.accent} fontSize={8} textAnchor="end" opacity={0.6}
-                            >
-                                Sleep {sleepThreshold}mg
-                            </SvgText>
-
-                            {/* Now vertical line */}
-                            <Line
-                                x1={chartData.nowX} y1={PAD.top}
-                                x2={chartData.nowX} y2={PAD.top + INNER_H}
-                                stroke={colors.primary} strokeWidth={1.5} strokeDasharray="3,3" strokeOpacity={0.5}
-                            />
-                            <Circle cx={chartData.nowX} cy={chartData.nowY} r={5} fill={colors.primary} opacity={0.3} />
-                            <Circle cx={chartData.nowX} cy={chartData.nowY} r={3} fill={colors.primary} />
-
-                            {/* X-axis hourly labels */}
-                            {chartData.hourLabels.map((lab, i) => (
-                                <SvgText
-                                    key={i} x={lab.x} y={PAD.top + INNER_H + 16}
-                                    fill={colors.textSecondary} fontSize={9} textAnchor="middle" opacity={0.6}
-                                >
-                                    {lab.label}
-                                </SvgText>
-                            ))}
-                        </Svg>
-                    </GlassmorphicCard>
-
-                    {/* Hourly Breakdown Table */}
-                    <GlassmorphicCard style={styles.tableCard} intensity={12}>
-                        <Text style={[styles.chartTitle, { color: colors.text }]}>Hourly Breakdown</Text>
-
-                        {/* Table Header */}
-                        <View style={[styles.tableRow, styles.tableHeader]}>
-                            <Text style={[styles.tableHeaderText, { color: colors.textSecondary }]}>Time</Text>
-                            <Text style={[styles.tableHeaderText, { color: colors.textSecondary }]}>Level</Text>
-                            <Text style={[styles.tableHeaderText, styles.statusCol, { color: colors.textSecondary }]}>Status</Text>
-                        </View>
-
-                        {/* Table Rows */}
-                        {hourlyBreakdown.map((entry, i) => (
-                            <View
-                                key={i}
-                                style={[styles.tableRow, {
-                                    backgroundColor: entry.isNow
-                                        ? (theme === 'dark' ? 'rgba(0,240,255,0.08)' : 'rgba(0,122,255,0.08)')
-                                        : 'transparent',
-                                    borderLeftWidth: entry.isNow ? 3 : 0,
-                                    borderLeftColor: entry.isNow ? colors.primary : 'transparent',
-                                    opacity: entry.isPast ? 0.5 : 1,
-                                }]}
-                            >
-                                <Text style={[styles.tableTime, { color: colors.text }]}>
-                                    {entry.isNow ? '▸ Now' : entry.time}
+                    <FadeInSlot slotIndex={STATS_SLOTS.hero} variant="fast">
+                        <GlassmorphicCard style={[styles.heroCard, { marginVertical: 8 }]}>
+                            <Text style={[styles.heroEyebrow, { color: colors.textSecondary }]}>
+                                Current level
+                            </Text>
+                            <Text style={[styles.heroMg, { color: colors.primary }]}>
+                                {Math.round(currentLevel)}
+                                <Text style={[styles.heroMgUnit, { color: colors.textSecondary }]}>
+                                    {' '}
+                                    mg
                                 </Text>
-                                <Text style={[styles.tableLevel, { color: colors.text }]}>
-                                    {entry.level} mg
+                            </Text>
+                            <Text style={[styles.heroSub, { color: colors.text }]}>
+                                {todayDoses.length} drink{todayDoses.length !== 1 ? 's' : ''} ·{' '}
+                                {Math.round(totalToday)} mg today
+                            </Text>
+                            {firstDoseToday ? (
+                                <Text style={[styles.heroMicro, { color: colors.textSecondary }]}>
+                                    First dose {format(new Date(firstDoseToday.timestamp), timeFmt)}
+                                    {peakCaffeineToday > 0
+                                        ? ` · Peak today ${Math.round(peakCaffeineToday)} mg`
+                                        : ''}
                                 </Text>
-                                <View style={[styles.statusCol, styles.statusBadge, { backgroundColor: entry.statusColor + '20' }]}>
-                                    <Text style={[styles.statusText, { color: entry.statusColor }]}>
-                                        {entry.status}
-                                    </Text>
-                                </View>
+                            ) : null}
+                            <View style={[styles.heroDivider, { backgroundColor: tableBorder }]} />
+                            <Text style={[styles.heroMicro, { color: colors.textSecondary }]}>
+                                {isClear
+                                    ? `Below ${sleepThreshold} mg — clear for sleep`
+                                    : `Below ${sleepThreshold} mg by ${format(new Date(clearanceTime), timeFmt)}`}
+                            </Text>
+                        </GlassmorphicCard>
+                    </FadeInSlot>
+
+                    <FadeInSlot slotIndex={STATS_SLOTS.metrics} variant="fast">
+                        <View style={styles.sectionBlock}>
+                            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+                                Last 7 days
+                            </Text>
+                            <View style={styles.weekStrip}>
+                                {sevenDays.map((d, i) => {
+                                    const h = d.totalMg <= 0 ? 4 : 8 + (d.totalMg / weekMaxMg) * 28;
+                                    return (
+                                        <View key={d.date} style={styles.weekBarCol}>
+                                            <View
+                                                style={[
+                                                    styles.weekBar,
+                                                    {
+                                                        height: h,
+                                                        backgroundColor:
+                                                            d.doseCount > 0
+                                                                ? colors.primary
+                                                                : colors.border,
+                                                        opacity: d.doseCount > 0 ? 0.9 : 0.35,
+                                                    },
+                                                ]}
+                                            />
+                                            <Text
+                                                style={[styles.weekBarLabel, { color: colors.textSecondary }]}
+                                            >
+                                                {d.weekday}
+                                            </Text>
+                                        </View>
+                                    );
+                                })}
                             </View>
-                        ))}
-                    </GlassmorphicCard>
+                            {(bestDay && quietDay) || vsAvgCopy ? (
+                                <Text style={[styles.weekCaption, { color: colors.textSecondary }]}>
+                                    {bestDay && quietDay && bestDay.date !== quietDay.date
+                                        ? `Heaviest ${bestDay.weekday} · Lightest ${quietDay.weekday}`
+                                        : bestDay
+                                          ? `Most intake ${bestDay.weekday}`
+                                          : ''}
+                                    {vsAvgCopy
+                                        ? `${bestDay && quietDay ? ' · ' : ''}${vsAvgCopy}`
+                                        : ''}
+                                </Text>
+                            ) : null}
+
+                            <Text
+                                style={[
+                                    styles.sectionLabel,
+                                    { color: colors.textSecondary, marginTop: 16 },
+                                ]}
+                            >
+                                Snapshot
+                            </Text>
+                            <View style={styles.bentoGrid}>
+                                <BentoTile
+                                    icon="calendar-outline"
+                                    label="7-day total"
+                                    value={`${Math.round(sum7Mg)} mg`}
+                                    hint={`${totalDoses7} drink${totalDoses7 !== 1 ? 's' : ''}`}
+                                    colors={colors}
+                                    theme={theme}
+                                />
+                                <BentoTile
+                                    icon="stats-chart-outline"
+                                    label="Avg / day"
+                                    value={
+                                        daysWithIntake.length
+                                            ? `${Math.round(avgMgPerDayActive)} mg`
+                                            : '—'
+                                    }
+                                    hint={daysWithIntake.length ? `${daysWithIntake.length} active days` : 'No drinks'}
+                                    colors={colors}
+                                    theme={theme}
+                                />
+                                <BentoTile
+                                    icon="water-outline"
+                                    label="Avg / drink"
+                                    value={
+                                        totalDoses7 > 0
+                                            ? `${Math.round(avgMgPerDrink7)} mg`
+                                            : '—'
+                                    }
+                                    hint="Rolling 7 days"
+                                    colors={colors}
+                                    theme={theme}
+                                />
+                                <BentoTile
+                                    icon="flash-outline"
+                                    label="Peak energy"
+                                    value={
+                                        peakTime <= now + 5 * 60 * 1000
+                                            ? 'Now'
+                                            : format(new Date(peakTime), timeFmt)
+                                    }
+                                    hint="Next ~6h window"
+                                    colors={colors}
+                                    theme={theme}
+                                />
+                                <BentoTile
+                                    icon="moon-outline"
+                                    label="Sleep threshold"
+                                    value={isClear ? 'Clear' : format(new Date(clearanceTime), timeFmt)}
+                                    hint={`Goal < ${sleepThreshold} mg`}
+                                    colors={colors}
+                                    theme={theme}
+                                />
+                                <BentoTile
+                                    icon="flask-outline"
+                                    label="Half-life"
+                                    value={`${effectiveHalfLife.toFixed(1)} h`}
+                                    hint={`Weight ${weightKg} kg`}
+                                    colors={colors}
+                                    theme={theme}
+                                />
+                            </View>
+                        </View>
+                    </FadeInSlot>
+
+                    <FadeInSlot slotIndex={STATS_SLOTS.chart} variant="fast">
+                        <GlassmorphicCard style={{ marginVertical: 8 }}>
+                            <Text style={[styles.chartTitle, { color: colors.text }]}>Trend</Text>
+                            <Text style={[styles.chartSubtitle, { color: colors.textSecondary }]}>
+                                12-hour forecast vs sleep line
+                            </Text>
+                            <Svg width={CHART_W} height={CHART_H}>
+                                <Defs>
+                                    <SvgLinearGradient id="detailGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <Stop offset="0" stopColor={colors.primary} stopOpacity={0.25} />
+                                        <Stop offset="1" stopColor={colors.primary} stopOpacity={0} />
+                                    </SvgLinearGradient>
+                                </Defs>
+
+                                {chartData.nightZones.map((zone, i) => (
+                                    <Rect
+                                        key={`night-${i}`}
+                                        x={zone.x}
+                                        y={PAD.top}
+                                        width={zone.width}
+                                        height={INNER_H}
+                                        fill={chartData.nightZoneFill}
+                                        rx={4}
+                                    />
+                                ))}
+
+                                <Path d={chartData.areaPath} fill="url(#detailGrad)" />
+
+                                <Path
+                                    d={chartData.linePath}
+                                    stroke={colors.primary}
+                                    strokeWidth={2.5}
+                                    fill="none"
+                                    strokeLinecap="round"
+                                />
+
+                                <Line
+                                    x1={PAD.left}
+                                    y1={chartData.thresholdY}
+                                    x2={CHART_W - PAD.right}
+                                    y2={chartData.thresholdY}
+                                    stroke={colors.accent}
+                                    strokeWidth={1}
+                                    strokeDasharray="5,3"
+                                    strokeOpacity={0.5}
+                                />
+                                <SvgText
+                                    x={CHART_W - PAD.right - 2}
+                                    y={chartData.thresholdY - 4}
+                                    fill={colors.accent}
+                                    fontSize={8}
+                                    textAnchor="end"
+                                    opacity={0.65}
+                                >
+                                    Sleep {sleepThreshold} mg
+                                </SvgText>
+
+                                <Line
+                                    x1={chartData.nowX}
+                                    y1={PAD.top}
+                                    x2={chartData.nowX}
+                                    y2={PAD.top + INNER_H}
+                                    stroke={colors.primary}
+                                    strokeWidth={1.5}
+                                    strokeDasharray="3,3"
+                                    strokeOpacity={0.5}
+                                />
+                                <Circle cx={chartData.nowX} cy={chartData.nowY} r={5} fill={colors.primary} opacity={0.3} />
+                                <Circle cx={chartData.nowX} cy={chartData.nowY} r={3} fill={colors.primary} />
+
+                                {chartData.hourLabels.map((lab, i) => (
+                                    <SvgText
+                                        key={i}
+                                        x={lab.x}
+                                        y={PAD.top + INNER_H + 16}
+                                        fill={colors.textSecondary}
+                                        fontSize={9}
+                                        textAnchor="middle"
+                                        opacity={0.65}
+                                    >
+                                        {lab.label}
+                                    </SvgText>
+                                ))}
+                            </Svg>
+                        </GlassmorphicCard>
+                    </FadeInSlot>
+
+                    <FadeInSlot slotIndex={STATS_SLOTS.table} variant="fast">
+                        <GlassmorphicCard style={{ marginVertical: 8 }}>
+                            <View style={styles.tableHeadRow}>
+                                <Text style={[styles.chartTitle, { color: colors.text, marginBottom: 0 }]}>
+                                    Hourly breakdown
+                                </Text>
+                            </View>
+
+                            <View style={styles.segmentRow}>
+                                {(
+                                    [
+                                        { id: 'all' as const, label: 'All' },
+                                        { id: 'past' as const, label: 'Earlier' },
+                                        { id: 'future' as const, label: 'Next 12h' },
+                                    ] as const
+                                ).map(seg => {
+                                    const on = hourlyFilter === seg.id;
+                                    return (
+                                        <PressableScale
+                                            key={seg.id}
+                                            onPress={() => setHourlyFilter(seg.id)}
+                                            style={[
+                                                styles.segmentChip,
+                                                {
+                                                    backgroundColor: on
+                                                        ? colors.primary + '22'
+                                                        : theme === 'dark'
+                                                          ? 'rgba(255,255,255,0.06)'
+                                                          : 'rgba(0,0,0,0.04)',
+                                                    borderColor: on ? colors.primary : colors.border,
+                                                },
+                                            ]}
+                                        >
+                                            <Text
+                                                style={{
+                                                    fontSize: 12,
+                                                    fontWeight: '700',
+                                                    color: on ? colors.primary : colors.textSecondary,
+                                                }}
+                                            >
+                                                {seg.label}
+                                            </Text>
+                                        </PressableScale>
+                                    );
+                                })}
+                            </View>
+
+                            <View
+                                style={[
+                                    styles.tableRow,
+                                    styles.tableHeader,
+                                    { borderBottomColor: tableBorder },
+                                ]}
+                            >
+                                <Text style={[styles.tableHeaderText, { color: colors.textSecondary }]}>
+                                    Time
+                                </Text>
+                                <Text style={[styles.tableHeaderText, { color: colors.textSecondary }]}>
+                                    Level
+                                </Text>
+                                <Text
+                                    style={[
+                                        styles.tableHeaderText,
+                                        styles.statusCol,
+                                        { color: colors.textSecondary },
+                                    ]}
+                                >
+                                    Status
+                                </Text>
+                            </View>
+
+                            {visibleHourly.map((entry, i) => {
+                                const rowEl = (
+                                    <View
+                                        style={[
+                                            styles.tableRow,
+                                            {
+                                                backgroundColor: entry.isNow
+                                                    ? theme === 'dark'
+                                                        ? 'rgba(0,240,255,0.08)'
+                                                        : 'rgba(0,122,255,0.08)'
+                                                    : i % 2 === 1
+                                                      ? zebra
+                                                      : 'transparent',
+                                                borderLeftWidth: entry.isNow ? 3 : 0,
+                                                borderLeftColor: entry.isNow ? colors.primary : 'transparent',
+                                                opacity: entry.isPast ? 0.55 : 1,
+                                            },
+                                        ]}
+                                    >
+                                        <Text style={[styles.tableTime, { color: colors.text }]}>
+                                            {entry.isNow ? 'Now' : entry.time}
+                                        </Text>
+                                        <Text
+                                            style={[
+                                                styles.tableLevel,
+                                                { color: colors.text },
+                                            ]}
+                                        >
+                                            {entry.level} mg
+                                        </Text>
+                                        <View
+                                            style={[
+                                                styles.statusCol,
+                                                styles.statusBadge,
+                                                { backgroundColor: entry.statusColor + '20' },
+                                            ]}
+                                        >
+                                            <Text
+                                                style={[styles.statusText, { color: entry.statusColor }]}
+                                            >
+                                                {entry.status}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                );
+
+                                const animateRow =
+                                    FEATURES.UI_MOTION && !reduceMotion && i < HOUR_ROW_ANIM_CAP;
+                                const key = `h${entry.hourOffset}`;
+
+                                if (animateRow) {
+                                    return (
+                                        <Animated.View
+                                            key={key}
+                                            entering={FadeIn.delay(i * ROW_STAGGER_MS).duration(215)}
+                                        >
+                                            {rowEl}
+                                        </Animated.View>
+                                    );
+                                }
+
+                                return (
+                                    <View key={key}>
+                                        {rowEl}
+                                    </View>
+                                );
+                            })}
+                        </GlassmorphicCard>
+                    </FadeInSlot>
 
                     <View style={{ height: 40 }} />
                 </ScrollView>
@@ -393,41 +776,107 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     safeArea: { flex: 1 },
     header: {
-        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 10,
+        paddingBottom: 15,
     },
     backButton: { padding: 8, borderRadius: 12 },
     title: { fontSize: 20, fontWeight: 'bold' },
     content: { paddingHorizontal: 16 },
 
-    // Quick stat row
-    statRow: {
-        flexDirection: 'row', flexWrap: 'wrap',
-        justifyContent: 'space-between', marginBottom: 12,
+    heroCard: { paddingVertical: 4 },
+    heroEyebrow: {
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
+        marginBottom: 4,
     },
-    miniCard: { width: '48%', marginBottom: 10, alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
-    miniIcon: { fontSize: 22, marginBottom: 4, textAlign: 'center' },
-    miniLabel: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
-    miniSub: { fontSize: 11, marginTop: 2, textAlign: 'center' },
+    heroMg: { fontSize: 44, fontWeight: '800', fontVariant: ['tabular-nums'] },
+    heroMgUnit: { fontSize: 20, fontWeight: '600' },
+    heroSub: { fontSize: 16, fontWeight: '600', marginTop: 8 },
+    heroMicro: { fontSize: 13, marginTop: 6, lineHeight: 18 },
+    heroDivider: { height: StyleSheet.hairlineWidth, marginVertical: 12 },
 
-    // Chart
-    chartCard: { marginBottom: 12, alignItems: 'center' },
-    chartTitle: { fontSize: 15, fontWeight: '700', marginBottom: 8, alignSelf: 'flex-start' },
+    sectionBlock: { marginBottom: 4 },
+    sectionLabel: {
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
+        marginBottom: 10,
+    },
+    weekStrip: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-end',
+        paddingVertical: 8,
+        paddingHorizontal: 4,
+    },
+    weekBarCol: { flex: 1, alignItems: 'center' },
+    weekBar: { width: 10, borderRadius: 4, minHeight: 4 },
+    weekBarLabel: { fontSize: 10, marginTop: 6, fontWeight: '600' },
+    weekCaption: { fontSize: 12, marginTop: 6, lineHeight: 17 },
 
-    // Table
-    tableCard: { marginBottom: 12 },
+    bentoGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        rowGap: 10,
+    },
+    bentoTile: {
+        width: '48%',
+        borderRadius: 14,
+        borderWidth: StyleSheet.hairlineWidth,
+        padding: 12,
+        marginBottom: 2,
+    },
+    bentoTileTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+    bentoValue: { fontSize: 17, fontWeight: '800', flex: 1, fontVariant: ['tabular-nums'] },
+    bentoLabel: { fontSize: 12, fontWeight: '600', lineHeight: 16 },
+    bentoHint: { fontSize: 11, marginTop: 4, opacity: 0.85 },
+
+    chartTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4, alignSelf: 'flex-start' },
+    chartSubtitle: { fontSize: 12, marginBottom: 10, alignSelf: 'flex-start', opacity: 0.95 },
+    tableHeadRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    segmentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14, marginTop: 4 },
+
+    segmentChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12,
+        borderWidth: StyleSheet.hairlineWidth,
+    },
+
     tableRow: {
-        flexDirection: 'row', alignItems: 'center',
-        paddingVertical: 10, paddingHorizontal: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 8,
         borderRadius: 8,
     },
     tableHeader: {
-        borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)',
-        paddingBottom: 8, marginBottom: 4,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        paddingBottom: 8,
+        marginBottom: 4,
     },
-    tableHeaderText: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 },
+    tableHeaderText: {
+        fontSize: 11,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        flex: 1,
+    },
     tableTime: { flex: 1, fontSize: 14, fontWeight: '500' },
-    tableLevel: { flex: 1, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
+    tableLevel: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: '700',
+        fontVariant: ['tabular-nums'],
+    },
     statusCol: { flex: 1, alignItems: 'flex-end' },
     statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
     statusText: { fontSize: 11, fontWeight: '700' },
