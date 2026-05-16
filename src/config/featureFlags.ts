@@ -31,6 +31,11 @@ export const FEATURES = FLAGS as {
     INFO_POPUPS: boolean;
     STORE_REVIEW: boolean;
     HOME_WIDGET: boolean;
+    PAYWALL: boolean;
+    DOSE_ADVISOR: boolean;
+    CUSTOM_PRESETS: boolean;
+    CSV_EXPORT: boolean;
+    EXTENDED_HISTORY: boolean;
     BACKGROUND_NOTIFICATIONS: boolean;
     BACKGROUND_WIDGET_REFRESH: boolean;
     UI_MOTION: boolean;

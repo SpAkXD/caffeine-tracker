@@ -8,12 +8,15 @@ import * as Haptics from 'expo-haptics';
 import { DrinkPresetCard } from '../src/components/DrinkPresetCard';
 import { StyledButton } from '../src/components/StyledButton';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
+import { useProStore } from '../src/store/useProStore';
 import { Colors } from '../src/constants/Colors';
 import { FEATURES } from '../src/config/featureFlags';
 import { RateAppPromptModal } from '../src/components/RateAppPromptModal';
 import { requestInAppReview } from '../src/services/storeReview';
 import { FadeInSlot } from '../src/components/FadeInSlot';
 import { PressableScale } from '../src/components/PressableScale';
+import { PaywallModal } from '../src/components/PaywallModal';
+import { ProLockOverlay } from '../src/components/ProLockOverlay';
 import { useReduceMotion } from '../src/hooks/useReduceMotion';
 import { modalCardEntering } from '../src/constants/motion';
 
@@ -184,14 +187,18 @@ const MORE_DRINKS = [
 export default function AddDrinkScreen() {
     const router = useRouter();
     const addDose = useCaffeineStore(state => state.addDose);
+    const customPresets = useCaffeineStore(state => state.customPresets);
     const theme = useCaffeineStore(state => state.theme);
     const use24HourFormat = useCaffeineStore(state => state.use24HourFormat);
+    const isPro = useProStore(state => state.isPro)();
     const colors = Colors[theme];
     const reduceMotion = useReduceMotion();
 
+    const [paywallVisible, setPaywallVisible] = useState(false);
+
     const addSlots = useMemo(() => {
         let i = 0;
-        return { header: i++, presets: i++, more: i++, custom: i++ };
+        return { header: i++, presets: i++, more: i++, myDrinks: i++, custom: i++ };
     }, []);
 
     const [customMg, setCustomMg] = useState('');
@@ -397,6 +404,31 @@ export default function AddDrinkScreen() {
                 )}
                 </FadeInSlot>
 
+                {/* My Drinks — Pro custom presets */}
+                {FEATURES.CUSTOM_PRESETS && (
+                    <FadeInSlot slotIndex={addSlots.myDrinks}>
+                        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>My Drinks</Text>
+                        {isPro && customPresets.length > 0 ? (
+                            <View style={styles.presetsGrid}>
+                                {customPresets.map((p) => (
+                                    <DrinkPresetCard
+                                        key={p.id}
+                                        name={p.name}
+                                        mg={p.mg}
+                                        onPress={() => showConfirmation(p.name, p.mg)}
+                                    />
+                                ))}
+                            </View>
+                        ) : isPro ? (
+                            <Text style={[styles.emptyCustom, { color: colors.textSecondary }]}>
+                                Add custom drinks in Settings → Manage Custom Drinks
+                            </Text>
+                        ) : (
+                            <ProLockOverlay onPress={() => setPaywallVisible(true)} label="Unlock Custom Drinks — Pro" />
+                        )}
+                    </FadeInSlot>
+                )}
+
                 <FadeInSlot slotIndex={addSlots.custom}>
                 <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Custom Amount</Text>
                 <View style={styles.customRow}>
@@ -594,6 +626,10 @@ export default function AddDrinkScreen() {
                     router.back();
                 }}
             />
+
+            {FEATURES.PAYWALL && (
+                <PaywallModal visible={paywallVisible} onClose={() => setPaywallVisible(false)} />
+            )}
         </View>
     );
 }
@@ -682,6 +718,18 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '500',
         opacity: 0.7,
+    },
+    presetsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    emptyCustom: {
+        fontSize: 13,
+        textAlign: 'center',
+        paddingVertical: 16,
+        lineHeight: 20,
     },
     // Modal styles
     modalOverlay: {

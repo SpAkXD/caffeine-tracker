@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoodEnergyWidget } from './GoodEnergyWidget';
 import { calculateStackedCaffeine, calculateClearanceTime } from '../utils/math';
 import { format } from 'date-fns';
+import { useProStore } from '../store/useProStore';
 
 /**
  * Trigger an immediate widget refresh.
@@ -17,6 +18,18 @@ import { format } from 'date-fns';
  */
 export async function refreshWidget(): Promise<void> {
     if (Platform.OS !== 'android') return;
+
+    // Widget is a Pro feature — show upgrade prompt if not Pro
+    const isPro = useProStore.getState().isPro();
+    if (!isPro) {
+        await requestWidgetUpdate({
+            widgetName: 'GoodEnergy',
+            renderWidget: () => (
+                <GoodEnergyWidget currentLevel={0} crashTime="Upgrade to Pro" />
+            ),
+        }).catch(() => {});
+        return;
+    }
 
     try {
         const raw = await AsyncStorage.getItem('caffeine-storage');

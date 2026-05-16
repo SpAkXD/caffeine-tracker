@@ -66,6 +66,22 @@ module.exports = {
         /** Periodic in-app review prompt (every 10th logged drink) + Settings → Rate us */
         STORE_REVIEW: true,
 
+        // ── Pro Features ──────────────────────────────────────────────────
+        /** In-app paywall and Pro upgrade flow */
+        PAYWALL: true,
+
+        /** Smart Dose Advisor screen */
+        DOSE_ADVISOR: true,
+
+        /** Custom drink presets (Pro) */
+        CUSTOM_PRESETS: true,
+
+        /** CSV export of dose history (Pro) */
+        CSV_EXPORT: true,
+
+        /** Extended 30-day history retention (Pro vs free 3-day) */
+        EXTENDED_HISTORY: true,
+
         // ── Home Screen Widget ────────────────────────────────────────────
         /** Real Android home screen widget (GoodEnergy) */
         HOME_WIDGET: true,

@@ -7,10 +7,12 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { LogBox, Platform } from 'react-native';
+import { purchaseUpdatedListener, purchaseErrorListener } from 'react-native-iap';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { Colors } from '../src/constants/Colors';
 import '../src/services/backgroundTask'; // Register background task definitions (renamed to .tsx for widget JSX)
 import { unregisterBackgroundTask } from '../src/services/backgroundTask';
+import { initIAP, endIAP, handlePurchaseSuccess, handlePurchaseError } from '../src/services/iapService';
 
 // Suppress Expo Go notification warning/error since we use local notifications
 LogBox.ignoreLogs([
@@ -43,12 +45,20 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
-      // One-time migration: remove stale background fetch registration from pre-v2.0.1 installs.
-      // registerBackgroundTask was removed in v2.0.1 but the OS-level registration persists
-      // across app updates unless explicitly unregistered. This is a safe no-op if not registered.
       unregisterBackgroundTask().catch(() => { });
     }
   }, [loaded]);
+
+  useEffect(() => {
+    initIAP();
+    const purchaseSub = purchaseUpdatedListener(handlePurchaseSuccess);
+    const errorSub = purchaseErrorListener(handlePurchaseError);
+    return () => {
+      purchaseSub.remove();
+      errorSub.remove();
+      endIAP();
+    };
+  }, []);
 
   if (!loaded) {
     return null;
@@ -89,6 +99,14 @@ export default function RootLayout() {
             name="detailed-stats"
             options={{
               title: 'Detailed Statistics',
+              headerShown: false,
+              animation: 'slide_from_right',
+            }}
+          />
+          <Stack.Screen
+            name="dose-advisor"
+            options={{
+              title: 'Dose Advisor',
               headerShown: false,
               animation: 'slide_from_right',
             }}

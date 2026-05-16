@@ -6,6 +6,12 @@ import { addHours, subHours, subDays, startOfDay, format, isSameDay } from 'date
 import { refreshWidget } from '../widget/refreshWidget';
 import { scheduleCaffeineUpdates } from '../services/notificationService';
 
+export interface CustomPreset {
+    id: string;
+    name: string;
+    mg: number;
+}
+
 interface DailyStats {
     date: string; // 'YYYY-MM-DD'
     totalMg: number;
@@ -24,6 +30,7 @@ interface CaffeineState {
     bedtimeHour: number; // 0-23, default 22 (10 PM)
     use24HourFormat: boolean; // 12h vs 24h time display
     isProDebug: boolean; // Dev toggle to simulate Pro mode
+    customPresets: CustomPreset[];
 
     // === SINGLE SOURCE OF TRUTH ===
     // These are computed once and shared across all components.
@@ -43,6 +50,9 @@ interface CaffeineState {
     setBedtime: (hour: number) => void;
     clearDoses: () => void;
     cleanupOldDoses: () => void;
+    addCustomPreset: (name: string, mg: number) => void;
+    removeCustomPreset: (id: string) => void;
+    updateCustomPreset: (id: string, partial: Partial<Pick<CustomPreset, 'name' | 'mg'>>) => void;
     refreshCurrentLevel: () => void; // Recalculate currentLevel + clearanceTime from Date.now()
     toggleProDebug: () => void;
 
@@ -67,7 +77,8 @@ const calculateEffectiveHalfLife = (baseHalfLife: number, weightKg: number): num
     return Math.max(3, Math.min(7, effectiveHalfLife));
 };
 
-const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+const FREE_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
+const PRO_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const useCaffeineStore = create<CaffeineState>()(
     persist(
@@ -83,6 +94,7 @@ export const useCaffeineStore = create<CaffeineState>()(
             bedtimeHour: 22,
             use24HourFormat: false,
             isProDebug: false,
+            customPresets: [],
 
             // === Single Source of Truth state ===
             currentLevel: 0,
@@ -162,9 +174,35 @@ export const useCaffeineStore = create<CaffeineState>()(
             },
 
             cleanupOldDoses: () => {
-                const cutoff = Date.now() - THREE_DAYS_MS;
+                // Import lazily to avoid circular deps at module init time
+                const { useProStore } = require('./useProStore');
+                const isPro = useProStore.getState().isPro();
+                const cutoff = Date.now() - (isPro ? PRO_RETENTION_MS : FREE_RETENTION_MS);
                 set((state) => ({
                     doses: state.doses.filter((d) => d.timestamp >= cutoff),
+                }));
+            },
+
+            addCustomPreset: (name, mg) => {
+                set((state) => ({
+                    customPresets: [
+                        ...state.customPresets,
+                        { id: Math.random().toString(36).substr(2, 9), name, mg },
+                    ],
+                }));
+            },
+
+            removeCustomPreset: (id) => {
+                set((state) => ({
+                    customPresets: state.customPresets.filter((p) => p.id !== id),
+                }));
+            },
+
+            updateCustomPreset: (id, partial) => {
+                set((state) => ({
+                    customPresets: state.customPresets.map((p) =>
+                        p.id === id ? { ...p, ...partial } : p
+                    ),
                 }));
             },
 

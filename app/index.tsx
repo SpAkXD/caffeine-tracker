@@ -14,17 +14,21 @@ import { GlassmorphicCard } from '../src/components/GlassmorphicCard';
 import { HistoryCard } from '../src/components/HistoryCard';
 import { FadeInSlot } from '../src/components/FadeInSlot';
 import { PressableScale } from '../src/components/PressableScale';
+import { PaywallModal } from '../src/components/PaywallModal';
+import { ProBadge } from '../src/components/ProBadge';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
+import { useProStore } from '../src/store/useProStore';
 import { Colors } from '../src/constants/Colors';
 
 import { FEATURES } from '../src/config/featureFlags';
 
-type ScrollSlotKey = 'caffeine' | 'sleepQuality' | 'sleepForecast' | 'chart' | 'details' | 'history' | 'fab';
+type ScrollSlotKey = 'caffeine' | 'sleepQuality' | 'sleepForecast' | 'chart' | 'details' | 'advisor' | 'history' | 'fab';
 
 export default function Dashboard() {
     const router = useRouter();
     const theme = useCaffeineStore(state => state.theme);
     const isProDebug = useCaffeineStore(state => state.isProDebug);
+    const isPro = useProStore(state => state.isPro)();
     const colors = Colors[theme];
     const insets = useSafeAreaInsets();
 
@@ -32,6 +36,7 @@ export default function Dashboard() {
     const [showAlertness, setShowAlertness] = useState(true);
     const [showThreshold, setShowThreshold] = useState(false);
     const [currentTime, setCurrentTime] = useState(Date.now());
+    const [paywallVisible, setPaywallVisible] = useState(false);
 
     const scrollSlots = useMemo(() => {
         let i = 0;
@@ -40,11 +45,12 @@ export default function Dashboard() {
         if (FEATURES.SLEEP_QUALITY) slots.sleepQuality = i++;
         if (FEATURES.SLEEP_FORECAST) slots.sleepForecast = i++;
         if (FEATURES.DECAY_CHART) slots.chart = i++;
-        if (FEATURES.DETAILED_STATS || isProDebug) slots.details = i++;
+        if (FEATURES.DETAILED_STATS) slots.details = i++;
+        if (FEATURES.DOSE_ADVISOR) slots.advisor = i++;
         if (FEATURES.HISTORY_CARD) slots.history = i++;
         if (FEATURES.ADD_DRINK) slots.fab = i++;
         return slots;
-    }, [isProDebug]);
+    }, []);
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', nextAppState => {
@@ -137,7 +143,7 @@ export default function Dashboard() {
                         </FadeInSlot>
                     )}
 
-                    {(FEATURES.DETAILED_STATS || isProDebug) && scrollSlots.details !== undefined && (
+                    {FEATURES.DETAILED_STATS && scrollSlots.details !== undefined && (
                         <FadeInSlot slotIndex={scrollSlots.details}>
                             <PressableScale
                                 style={[
@@ -148,11 +154,49 @@ export default function Dashboard() {
                                         borderColor: colors.border,
                                     },
                                 ]}
-                                onPress={() => router.push('./detailed-stats' as any)}
+                                onPress={() => {
+                                    if (isPro) {
+                                        router.push('./detailed-stats' as any);
+                                    } else {
+                                        setPaywallVisible(true);
+                                    }
+                                }}
                             >
                                 <Ionicons name="analytics-outline" size={18} color={colors.primary} />
                                 <Text style={[styles.detailsButtonText, { color: colors.text }]}>Detailed Statistics</Text>
-                                <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                                {isPro
+                                    ? <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                                    : <ProBadge />
+                                }
+                            </PressableScale>
+                        </FadeInSlot>
+                    )}
+
+                    {FEATURES.DOSE_ADVISOR && scrollSlots.advisor !== undefined && (
+                        <FadeInSlot slotIndex={scrollSlots.advisor}>
+                            <PressableScale
+                                style={[
+                                    styles.detailsButton,
+                                    {
+                                        backgroundColor:
+                                            theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                                        borderColor: colors.border,
+                                    },
+                                ]}
+                                onPress={() => {
+                                    if (isPro) {
+                                        router.push('./dose-advisor' as any);
+                                    } else {
+                                        setPaywallVisible(true);
+                                    }
+                                }}
+                            >
+                                <Ionicons name="bulb-outline" size={18} color={colors.primary} />
+                                <Text style={[styles.detailsButtonText, { color: colors.text }]}>Dose Advisor</Text>
+                                {isPro
+                                    ? <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                                    : <ProBadge />
+                                }
                             </PressableScale>
                         </FadeInSlot>
                     )}
@@ -181,6 +225,10 @@ export default function Dashboard() {
                     </FadeInSlot>
                 )}
             </SafeAreaView>
+
+            {FEATURES.PAYWALL && (
+                <PaywallModal visible={paywallVisible} onClose={() => setPaywallVisible(false)} />
+            )}
         </View>
     );
 }

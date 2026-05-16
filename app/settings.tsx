@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, ScrollView, Switch, Linking } from 'react-native';
+import { View, Text, StyleSheet, Alert, ScrollView, Switch, Linking, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import Constants from 'expo-constants';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
+import { useProStore } from '../src/store/useProStore';
 import { StyledButton } from '../src/components/StyledButton';
 import { GlassmorphicCard } from '../src/components/GlassmorphicCard';
 import { Colors } from '../src/constants/Colors';
@@ -16,9 +17,13 @@ import {
 import { openStoreListing } from '../src/services/storeReview';
 import { WidgetPreview } from '../src/components/WidgetPreview';
 import { PressableScale } from '../src/components/PressableScale';
+import { PaywallModal } from '../src/components/PaywallModal';
+import { CustomPresetEditor } from '../src/components/CustomPresetEditor';
 
 import { FEATURES } from '../src/config/featureFlags';
 import { InfoPopupModal } from '../src/components/InfoPopupModal';
+import { exportDosesAsCsv } from '../src/utils/csvExport';
+import { restorePurchases } from '../src/services/iapService';
 
 export default function SettingsScreen() {
     const halfLifeHours = useCaffeineStore(state => state.halfLifeHours);
@@ -38,6 +43,9 @@ export default function SettingsScreen() {
     const getCurrentLevel = useCaffeineStore(state => state.getCurrentLevel);
     const isProDebug = useCaffeineStore(state => state.isProDebug);
     const toggleProDebug = useCaffeineStore(state => state.toggleProDebug);
+    const doses = useCaffeineStore(state => state.doses);
+
+    const isPro = useProStore(state => state.isPro)();
 
     const colors = Colors[theme];
 
@@ -48,6 +56,12 @@ export default function SettingsScreen() {
 
     // Info popup state
     const [infoPopup, setInfoPopup] = useState<{ title: string; description: string } | null>(null);
+
+    // Pro modal state
+    const [paywallVisible, setPaywallVisible] = useState(false);
+    const [presetEditorVisible, setPresetEditorVisible] = useState(false);
+    const [csvExporting, setCsvExporting] = useState(false);
+    const [restoring, setRestoring] = useState(false);
 
     const INFO_DESCRIPTIONS: Record<string, { title: string; description: string }> = {
         weight: {
@@ -352,6 +366,115 @@ export default function SettingsScreen() {
                     </GlassmorphicCard>
                 )}
 
+                {/* Pro Section */}
+                {FEATURES.PAYWALL && (
+                    <GlassmorphicCard style={styles.card}>
+                        {isPro ? (
+                            <>
+                                <View style={styles.proUnlockedRow}>
+                                    <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                                    <Text style={[styles.proUnlockedText, { color: colors.primary }]}>
+                                        Pro Unlocked
+                                    </Text>
+                                </View>
+
+                                {/* Manage Custom Presets */}
+                                {FEATURES.CUSTOM_PRESETS && (
+                                    <PressableScale style={styles.proRow} onPress={() => setPresetEditorVisible(true)}>
+                                        <Ionicons name="cafe-outline" size={20} color={colors.text} />
+                                        <Text style={[styles.proRowText, { color: colors.text }]}>
+                                            Manage Custom Drinks
+                                        </Text>
+                                        <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                                    </PressableScale>
+                                )}
+
+                                {/* CSV Export */}
+                                {FEATURES.CSV_EXPORT && (
+                                    <PressableScale
+                                        style={styles.proRow}
+                                        onPress={async () => {
+                                            if (csvExporting) return;
+                                            setCsvExporting(true);
+                                            try {
+                                                const getEffectiveHalfLife = useCaffeineStore.getState().getEffectiveHalfLife;
+                                                await exportDosesAsCsv(doses, getEffectiveHalfLife());
+                                            } catch (e: any) {
+                                                Alert.alert('Export failed', e?.message ?? 'Unknown error');
+                                            } finally {
+                                                setCsvExporting(false);
+                                            }
+                                        }}
+                                    >
+                                        <Ionicons name="download-outline" size={20} color={colors.text} />
+                                        <Text style={[styles.proRowText, { color: colors.text }]}>
+                                            Export Data (CSV)
+                                        </Text>
+                                        {csvExporting
+                                            ? <ActivityIndicator size="small" color={colors.textSecondary} />
+                                            : <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                                        }
+                                    </PressableScale>
+                                )}
+
+                                {/* Restore Purchases (required by Google policy) */}
+                                <PressableScale
+                                    style={styles.proRow}
+                                    onPress={async () => {
+                                        setRestoring(true);
+                                        try {
+                                            await restorePurchases();
+                                            Alert.alert('Restored', 'Purchase status refreshed.');
+                                        } catch {
+                                            Alert.alert('Error', 'Could not connect to the Play Store.');
+                                        } finally {
+                                            setRestoring(false);
+                                        }
+                                    }}
+                                >
+                                    <Ionicons name="refresh-outline" size={20} color={colors.text} />
+                                    <Text style={[styles.proRowText, { color: colors.text }]}>Restore Purchase</Text>
+                                    {restoring
+                                        ? <ActivityIndicator size="small" color={colors.textSecondary} />
+                                        : <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                                    }
+                                </PressableScale>
+                            </>
+                        ) : (
+                            <>
+                                <PressableScale style={styles.upgradeButton} onPress={() => setPaywallVisible(true)}>
+                                    <Ionicons name="flash" size={18} color="#000" />
+                                    <Text style={styles.upgradeText}>Upgrade to Pro — $1.99</Text>
+                                </PressableScale>
+                                <Text style={[styles.upgradeHint, { color: colors.textSecondary }]}>
+                                    One-time · Detailed Stats · Widget · Dose Advisor · CSV Export · Custom Drinks
+                                </Text>
+
+                                {/* Restore Purchases (required even for non-Pro users) */}
+                                <PressableScale
+                                    style={[styles.proRow, { marginTop: 8 }]}
+                                    onPress={async () => {
+                                        setRestoring(true);
+                                        try {
+                                            const restored = await restorePurchases();
+                                            if (!restored) Alert.alert('Nothing found', 'No previous Pro purchase on this account.');
+                                        } catch {
+                                            Alert.alert('Error', 'Could not connect to the Play Store.');
+                                        } finally {
+                                            setRestoring(false);
+                                        }
+                                    }}
+                                >
+                                    <Text style={[styles.restoreText, { color: colors.textSecondary }]}>
+                                        Restore Purchase
+                                    </Text>
+                                    {restoring && <ActivityIndicator size="small" color={colors.textSecondary} />}
+                                </PressableScale>
+                            </>
+                        )}
+                    </GlassmorphicCard>
+                )}
+
                 {FEATURES.CLEAR_DATA && (
                     <StyledButton
                         title="Reset All Data"
@@ -366,7 +489,7 @@ export default function SettingsScreen() {
                 </Text>
 
                 {/* Widget Preview */}
-                {(FEATURES.WIDGET_PREVIEW || isProDebug) && (
+                {FEATURES.WIDGET_PREVIEW && isPro && (
                     <GlassmorphicCard style={{ ...styles.card, marginTop: 20 }}>
                         <WidgetPreview />
                     </GlassmorphicCard>
@@ -423,6 +546,14 @@ export default function SettingsScreen() {
                 description={infoPopup?.description ?? ''}
                 onClose={() => setInfoPopup(null)}
             />
+
+            {FEATURES.PAYWALL && (
+                <PaywallModal visible={paywallVisible} onClose={() => setPaywallVisible(false)} />
+            )}
+
+            {FEATURES.CUSTOM_PRESETS && (
+                <CustomPresetEditor visible={presetEditorVisible} onClose={() => setPresetEditorVisible(false)} />
+            )}
         </View>
     );
 }
@@ -568,5 +699,53 @@ const styles = StyleSheet.create({
     devToggleText: {
         fontSize: 14,
         fontWeight: '700',
+    },
+    // Pro section styles
+    proUnlockedRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 12,
+    },
+    proUnlockedText: {
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    proRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        gap: 12,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.08)',
+    },
+    proRowText: {
+        flex: 1,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    upgradeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        backgroundColor: '#00F0FF',
+        borderRadius: 14,
+        paddingVertical: 14,
+        marginBottom: 10,
+    },
+    upgradeText: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#000',
+    },
+    upgradeHint: {
+        fontSize: 12,
+        textAlign: 'center',
+        lineHeight: 18,
+    },
+    restoreText: {
+        fontSize: 14,
+        fontWeight: '500',
     },
 });
