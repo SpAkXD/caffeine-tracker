@@ -12,7 +12,6 @@ import {
     requestNotificationPermissions,
     cancelAllNotifications,
     scheduleCaffeineUpdates,
-    scheduleTestNotification,
 } from '../src/services/notificationService';
 import { openStoreListing } from '../src/services/storeReview';
 import { WidgetPreview } from '../src/components/WidgetPreview';
@@ -40,9 +39,6 @@ export default function SettingsScreen() {
     const toggleNotifications = useCaffeineStore(state => state.toggleNotifications);
     const notificationFrequency = useCaffeineStore(state => state.notificationFrequency);
     const setNotificationFrequency = useCaffeineStore(state => state.setNotificationFrequency);
-    const getCurrentLevel = useCaffeineStore(state => state.getCurrentLevel);
-    const isProDebug = useCaffeineStore(state => state.isProDebug);
-    const toggleProDebug = useCaffeineStore(state => state.toggleProDebug);
     const doses = useCaffeineStore(state => state.doses);
 
     const isPro = useProStore(state => state.isPro)();
@@ -183,7 +179,7 @@ export default function SettingsScreen() {
                     </GlassmorphicCard>
                 )}
 
-                {(FEATURES.NOTIFICATIONS || isProDebug) && (
+                {FEATURES.NOTIFICATIONS && (
                     <GlassmorphicCard style={styles.card}>
                         <View style={styles.row}>
                             <Text style={[styles.label, { color: colors.primary }]}>Notifications</Text>
@@ -408,7 +404,7 @@ export default function SettingsScreen() {
                                     >
                                         <Ionicons name="download-outline" size={20} color={colors.text} />
                                         <Text style={[styles.proRowText, { color: colors.text }]}>
-                                            Export Data (CSV)
+                                            Export Data (Excel)
                                         </Text>
                                         {csvExporting
                                             ? <ActivityIndicator size="small" color={colors.textSecondary} />
@@ -493,48 +489,6 @@ export default function SettingsScreen() {
                     <GlassmorphicCard style={{ ...styles.card, marginTop: 20 }}>
                         <WidgetPreview />
                     </GlassmorphicCard>
-                )}
-
-                {/* DEV: Toggle Pro Mode */}
-                <PressableScale
-                    onPress={toggleProDebug}
-                    style={[
-                        styles.devToggle,
-                        {
-                            backgroundColor: isProDebug
-                                ? 'rgba(255, 149, 0, 0.15)'
-                                : theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                            borderColor: isProDebug ? '#FF9500' : colors.border,
-                        },
-                    ]}
-                >
-                    <Ionicons
-                        name={isProDebug ? 'flash' : 'flash-outline'}
-                        size={18}
-                        color={isProDebug ? '#FF9500' : colors.textSecondary}
-                    />
-                    <Text
-                        style={[
-                            styles.devToggleText,
-                            { color: isProDebug ? '#FF9500' : colors.textSecondary },
-                        ]}
-                    >
-                        DEV: Toggle Pro Mode {isProDebug ? '(ON)' : '(OFF)'}
-                    </Text>
-                </PressableScale>
-
-                {/* DEV: Send Test Notification (5s) */}
-                {isProDebug && (
-                    <StyledButton
-                        title="DEV: Send Test Notification (5s)"
-                        variant="secondary"
-                        onPress={() => {
-                            const level = getCurrentLevel();
-                            scheduleTestNotification(level);
-                            Alert.alert('Sent', 'Close the app now. Notification arriving in 5 seconds.');
-                        }}
-                        style={{ marginTop: 12, marginBottom: 20 }}
-                    />
                 )}
 
             </ScrollView>
@@ -683,22 +637,6 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         textAlign: 'center',
         marginTop: 8,
-    },
-    devToggle: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 30,
-        marginBottom: 20,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderRadius: 14,
-        borderWidth: 1,
-        gap: 8,
-    },
-    devToggleText: {
-        fontSize: 14,
-        fontWeight: '700',
     },
     // Pro section styles
     proUnlockedRow: {

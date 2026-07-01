@@ -87,16 +87,23 @@ TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
         const clearance = calculateClearanceTime(doses, sleepThreshold, effectiveHalfLife, now);
         let crashTimeStr = '· · · Clear · · ·';
         if (roundedLevel > sleepThreshold && clearance !== null) {
-            crashTimeStr = `Crash at ${format(new Date(clearance), 'h:mm a')}`;
+            const timePattern = state.use24HourFormat ? 'HH:mm' : 'h:mm a';
+            crashTimeStr = `Crash at ${format(new Date(clearance), timePattern)}`;
         }
 
-        // Update the home screen widget (always, regardless of notification setting)
+        // Update the home screen widget (always, regardless of notification setting).
+        // Widget is a Pro feature — non-Pro users get the upgrade placeholder.
         if (FEATURES.BACKGROUND_WIDGET_REFRESH && Platform.OS === 'android') {
             try {
+                const proRaw = await AsyncStorage.getItem('pro-storage');
+                const proState = proRaw ? JSON.parse(proRaw)?.state : null;
+                const isPro = proState?.hasPurchased === true;
                 await requestWidgetUpdate({
                     widgetName: 'GoodEnergy',
                     renderWidget: () => (
-                        <GoodEnergyWidget currentLevel={roundedLevel} crashTime={crashTimeStr} />
+                        isPro
+                            ? <GoodEnergyWidget currentLevel={roundedLevel} crashTime={crashTimeStr} />
+                            : <GoodEnergyWidget currentLevel={0} crashTime="Upgrade to Pro" />
                     ),
                 });
             } catch {

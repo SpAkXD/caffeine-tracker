@@ -27,7 +27,6 @@ type ScrollSlotKey = 'caffeine' | 'sleepQuality' | 'sleepForecast' | 'chart' | '
 export default function Dashboard() {
     const router = useRouter();
     const theme = useCaffeineStore(state => state.theme);
-    const isProDebug = useCaffeineStore(state => state.isProDebug);
     const isPro = useProStore(state => state.isPro)();
     const colors = Colors[theme];
     const insets = useSafeAreaInsets();

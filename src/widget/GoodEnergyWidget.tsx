@@ -12,6 +12,10 @@ interface GoodEnergyWidgetProps {
  *
  * Pure black, monospace, high contrast. No hooks allowed.
  * Uses FlexWidget/TextWidget primitives only.
+ *
+ * Layout: top row (label + refresh) / big number center / crash time bottom.
+ * The refresh button lives in the top-right corner so the crash time gets
+ * the full bottom width and never wraps or collides.
  */
 export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetProps) {
     return (
@@ -23,25 +27,54 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 backgroundColor: '#000000',
-                borderRadius: 16,
-                paddingHorizontal: 12,
-                paddingVertical: 10,
+                borderRadius: 24,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
             }}
             clickAction="OPEN_APP"
             accessibilityLabel="Caffeine tracker widget"
         >
-            {/* Top: CAFFEINE label */}
-            <TextWidget
-                text="CAFFEINE"
+            {/* Top row: CAFFEINE label (left) + refresh button (right) */}
+            <FlexWidget
                 style={{
-                    fontSize: 9,
-                    color: '#59595980',
-                    fontFamily: 'monospace',
-                    letterSpacing: 1.5,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    width: 'match_parent',
                 }}
-            />
+            >
+                <TextWidget
+                    text="CAFFEINE"
+                    style={{
+                        fontSize: 9,
+                        color: '#59595980',
+                        fontFamily: 'monospace',
+                        letterSpacing: 1.5,
+                    }}
+                />
+                <FlexWidget
+                    style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 17,
+                        backgroundColor: '#FFFFFF14',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}
+                    clickAction="REFRESH_WIDGET"
+                    clickActionData={{ action: 'REFRESH_WIDGET' }}
+                >
+                    <TextWidget
+                        text="↻"
+                        style={{
+                            fontSize: 16,
+                            color: '#FFFFFF99',
+                        }}
+                    />
+                </FlexWidget>
+            </FlexWidget>
 
-            {/* Center: Big number + unit — flex: 1 fills vertical space between label and bottom row */}
+            {/* Center: big number + unit */}
             <FlexWidget
                 style={{
                     flexDirection: 'column',
@@ -70,51 +103,19 @@ export function GoodEnergyWidget({ currentLevel, crashTime }: GoodEnergyWidgetPr
                 />
             </FlexWidget>
 
-            {/* Bottom row: Crash time + Refresh button */}
-            <FlexWidget
+            {/* Bottom: crash time — full width, centered, never collides */}
+            <TextWidget
+                text={crashTime}
+                truncate="END"
+                maxLines={1}
                 style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    width: 'match_parent',
-                    flexWrap: 'wrap',
-                    gap: 8,
+                    fontSize: 10,
+                    color: '#FFFFFF66',
+                    fontFamily: 'monospace',
+                    letterSpacing: 0.8,
+                    textAlign: 'center',
                 }}
-            >
-                <TextWidget
-                    text={crashTime}
-                    style={{
-                        fontSize: 10,
-                        color: '#FFFFFF66',
-                        fontFamily: 'monospace',
-                        letterSpacing: 0.8,
-                        flex: 1,
-                    }}
-                />
-                {/* Manual refresh button — larger tap target for easier interaction */}
-                <FlexWidget
-                    style={{
-                        minWidth: 50,
-                        minHeight: 44,
-                        paddingHorizontal: 14,
-                        paddingVertical: 10,
-                        borderRadius: 10,
-                        backgroundColor: '#FFFFFF1A',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                    }}
-                    clickAction="REFRESH_WIDGET"
-                    clickActionData={{ action: 'REFRESH_WIDGET' }}
-                >
-                    <TextWidget
-                        text="↻"
-                        style={{
-                            fontSize: 20,
-                            color: '#FFFFFFAA',
-                        }}
-                    />
-                </FlexWidget>
-            </FlexWidget>
+            />
         </FlexWidget>
     );
 }

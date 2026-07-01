@@ -37,9 +37,15 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({ visible, onClose }) 
         try {
             await purchasePro();
             // purchase listener in _layout.tsx handles state update + closing
-        } catch {
-            // purchasePro rejects on user cancel or error
-            Alert.alert('Purchase failed', 'Please try again.');
+        } catch (e: any) {
+            const code = e?.code ?? '';
+            // Ignore user-cancelled (they dismissed the sheet)
+            if (code === 'user-cancelled' || code === 'E_USER_CANCELLED') return;
+            console.warn('[PaywallModal] purchase failed:', JSON.stringify(e));
+            Alert.alert(
+                'Purchase failed',
+                e?.message ? `${e.message} (${code})` : 'Please try again.',
+            );
         } finally {
             setLoading(false);
         }
@@ -79,7 +85,7 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({ visible, onClose }) 
                     >
                         {/* Header */}
                         <View style={styles.header}>
-                            <Text style={[styles.title, { color: colors.primary }]}>Half-lifr Pro</Text>
+                            <Text style={[styles.title, { color: colors.primary }]}>Caffeine Tracker Pro</Text>
                             <Text style={[styles.price, { color: colors.text }]}>One-time · $1.99</Text>
                         </View>
 

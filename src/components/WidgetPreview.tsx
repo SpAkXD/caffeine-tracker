@@ -27,8 +27,13 @@ export const WidgetPreview: React.FC = () => {
 
             {/* Widget simulation */}
             <View style={styles.widget}>
-                {/* Top: centered label */}
-                <Text style={styles.appName}>CAFFEINE</Text>
+                {/* Top row: label + refresh button (mirrors real widget) */}
+                <View style={styles.topRow}>
+                    <Text style={styles.appName}>CAFFEINE</Text>
+                    <View style={styles.refreshCircle}>
+                        <Text style={styles.refreshGlyph}>↻</Text>
+                    </View>
+                </View>
 
                 {/* Center: big number */}
                 <View style={styles.centerBlock}>
@@ -65,12 +70,18 @@ const styles = StyleSheet.create({
         width: 170,
         height: 170,
         backgroundColor: '#000000',
-        borderRadius: 16,
+        borderRadius: 24,
         padding: 14,
         justifyContent: 'space-between',
         alignItems: 'center',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.08)',
+    },
+    topRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
     },
     appName: {
         color: 'rgba(255,255,255,0.35)',
@@ -78,7 +89,18 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         letterSpacing: 2,
         fontFamily: 'monospace',
-        textAlign: 'center',
+    },
+    refreshCircle: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    refreshGlyph: {
+        color: 'rgba(255,255,255,0.6)',
+        fontSize: 13,
     },
     centerBlock: {
         alignItems: 'center',

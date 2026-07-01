@@ -5,7 +5,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoodEnergyWidget } from './GoodEnergyWidget';
 import { calculateStackedCaffeine, calculateClearanceTime } from '../utils/math';
 import { format } from 'date-fns';
-import { useProStore } from '../store/useProStore';
 
 /**
  * Trigger an immediate widget refresh.
@@ -19,8 +18,11 @@ import { useProStore } from '../store/useProStore';
 export async function refreshWidget(): Promise<void> {
     if (Platform.OS !== 'android') return;
 
-    // Widget is a Pro feature — show upgrade prompt if not Pro
-    const isPro = useProStore.getState().isPro();
+    // Widget is a Pro feature — read pro state directly from AsyncStorage to avoid circular dep
+    const proRaw = await AsyncStorage.getItem('pro-storage');
+    const proState = proRaw ? JSON.parse(proRaw)?.state : null;
+    const cafRaw = await AsyncStorage.getItem('caffeine-storage');
+    const isPro = proState?.hasPurchased === true;
     if (!isPro) {
         await requestWidgetUpdate({
             widgetName: 'GoodEnergy',
@@ -32,7 +34,7 @@ export async function refreshWidget(): Promise<void> {
     }
 
     try {
-        const raw = await AsyncStorage.getItem('caffeine-storage');
+        const raw = cafRaw;
         if (!raw) {
             await requestWidgetUpdate({
                 widgetName: 'GoodEnergy',
@@ -63,7 +65,8 @@ export async function refreshWidget(): Promise<void> {
 
         let crashTime = '· · · Clear · · ·';
         if (currentLevel > sleepThreshold && clearance !== null) {
-            crashTime = `Crash at ${format(new Date(clearance), 'h:mm a')}`;
+            const timePattern = state.use24HourFormat ? 'HH:mm' : 'h:mm a';
+            crashTime = `Crash at ${format(new Date(clearance), timePattern)}`;
         }
 
         await requestWidgetUpdate({

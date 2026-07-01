@@ -29,7 +29,6 @@ interface CaffeineState {
     sleepQuality: 'great' | 'average' | 'poor';
     bedtimeHour: number; // 0-23, default 22 (10 PM)
     use24HourFormat: boolean; // 12h vs 24h time display
-    isProDebug: boolean; // Dev toggle to simulate Pro mode
     customPresets: CustomPreset[];
 
     // === SINGLE SOURCE OF TRUTH ===
@@ -54,7 +53,6 @@ interface CaffeineState {
     removeCustomPreset: (id: string) => void;
     updateCustomPreset: (id: string, partial: Partial<Pick<CustomPreset, 'name' | 'mg'>>) => void;
     refreshCurrentLevel: () => void; // Recalculate currentLevel + clearanceTime from Date.now()
-    toggleProDebug: () => void;
 
     // Selectors (still available for backward compat)
     getCurrentLevel: () => number;
@@ -93,7 +91,6 @@ export const useCaffeineStore = create<CaffeineState>()(
             sleepQuality: 'great',
             bedtimeHour: 22,
             use24HourFormat: false,
-            isProDebug: false,
             customPresets: [],
 
             // === Single Source of Truth state ===
@@ -203,12 +200,6 @@ export const useCaffeineStore = create<CaffeineState>()(
                     customPresets: state.customPresets.map((p) =>
                         p.id === id ? { ...p, ...partial } : p
                     ),
-                }));
-            },
-
-            toggleProDebug: () => {
-                set((state) => ({
-                    isProDebug: !state.isProDebug,
                 }));
             },
 

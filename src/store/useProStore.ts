@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCaffeineStore } from './useCaffeineStore';
 
 interface ProState {
     hasPurchased: boolean;
@@ -30,10 +29,7 @@ export const useProStore = create<ProState>()(
                 set({ hasPurchased: false, purchaseToken: null, purchaseDate: null, lastVerifiedAt: Date.now() });
             },
 
-            isPro: () => {
-                const isProDebug = useCaffeineStore.getState().isProDebug;
-                return isProDebug || get().hasPurchased;
-            },
+            isPro: () => get().hasPurchased,
         }),
         {
             name: 'pro-storage',

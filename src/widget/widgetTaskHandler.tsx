@@ -13,11 +13,16 @@ import { format } from 'date-fns';
  */
 async function getWidgetData(): Promise<{ currentLevel: number; crashTime: string }> {
     try {
+        const proRaw = await AsyncStorage.getItem('pro-storage');
+        const proState = proRaw ? JSON.parse(proRaw)?.state : null;
         const raw = await AsyncStorage.getItem('caffeine-storage');
+        const cafState = raw ? JSON.parse(raw)?.state : null;
+        const isPro = proState?.hasPurchased === true;
+        if (!isPro) return { currentLevel: 0, crashTime: 'Upgrade to Pro' };
+
         if (!raw) return { currentLevel: 0, crashTime: '· · · Clear · · ·' };
 
-        const store = JSON.parse(raw);
-        const state = store?.state;
+        const state = cafState;
         if (!state) return { currentLevel: 0, crashTime: '· · · Clear · · ·' };
 
         const doses = state.doses || [];
@@ -42,7 +47,8 @@ async function getWidgetData(): Promise<{ currentLevel: number; crashTime: strin
 
         let crashTime = '· · · Clear · · ·';
         if (currentLevel > sleepThreshold && clearance !== null) {
-            crashTime = `Crash at ${format(new Date(clearance), 'h:mm a')}`;
+            const timePattern = state.use24HourFormat ? 'HH:mm' : 'h:mm a';
+            crashTime = `Crash at ${format(new Date(clearance), timePattern)}`;
         }
 
         return { currentLevel, crashTime };
