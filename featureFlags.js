@@ -31,12 +31,19 @@ module.exports = {
         /** 3-day history card on dashboard */
         HISTORY_CARD: true,
 
+        /** Weekly summary card with streak tracking on dashboard */
+        WEEKLY_SUMMARY: true,
+
         /** "Detailed Statistics" button → opens detailed-stats page */
         DETAILED_STATS: true,
 
         // ── Add Drink Screen ──────────────────────────────────────────────
         /** The entire add-drink modal with preset cards + custom dose */
         ADD_DRINK: true,
+
+        // ── Onboarding ────────────────────────────────────────────────────
+        /** First-launch onboarding: half-life explainer + weight + bedtime */
+        ONBOARDING: true,
 
         // ── Settings Screen ───────────────────────────────────────────────
         /** Dark/Light theme toggle */

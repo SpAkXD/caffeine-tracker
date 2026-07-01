@@ -16,13 +16,15 @@ import { FadeInSlot } from '../src/components/FadeInSlot';
 import { PressableScale } from '../src/components/PressableScale';
 import { PaywallModal } from '../src/components/PaywallModal';
 import { ProBadge } from '../src/components/ProBadge';
+import { OnboardingModal } from '../src/components/OnboardingModal';
+import { WeeklySummaryCard } from '../src/components/WeeklySummaryCard';
 import { useCaffeineStore } from '../src/store/useCaffeineStore';
 import { useProStore } from '../src/store/useProStore';
 import { Colors } from '../src/constants/Colors';
 
 import { FEATURES } from '../src/config/featureFlags';
 
-type ScrollSlotKey = 'caffeine' | 'sleepQuality' | 'sleepForecast' | 'chart' | 'details' | 'advisor' | 'history' | 'fab';
+type ScrollSlotKey = 'caffeine' | 'sleepQuality' | 'sleepForecast' | 'chart' | 'details' | 'advisor' | 'history' | 'weekly' | 'fab';
 
 export default function Dashboard() {
     const router = useRouter();
@@ -47,6 +49,7 @@ export default function Dashboard() {
         if (FEATURES.DETAILED_STATS) slots.details = i++;
         if (FEATURES.DOSE_ADVISOR) slots.advisor = i++;
         if (FEATURES.HISTORY_CARD) slots.history = i++;
+        if (FEATURES.WEEKLY_SUMMARY) slots.weekly = i++;
         if (FEATURES.ADD_DRINK) slots.fab = i++;
         return slots;
     }, []);
@@ -206,6 +209,12 @@ export default function Dashboard() {
                         </FadeInSlot>
                     )}
 
+                    {FEATURES.WEEKLY_SUMMARY && scrollSlots.weekly !== undefined && (
+                        <FadeInSlot slotIndex={scrollSlots.weekly}>
+                            <WeeklySummaryCard />
+                        </FadeInSlot>
+                    )}
+
                     <View style={styles.spacer} />
                 </ScrollView>
 
@@ -228,6 +237,8 @@ export default function Dashboard() {
             {FEATURES.PAYWALL && (
                 <PaywallModal visible={paywallVisible} onClose={() => setPaywallVisible(false)} />
             )}
+
+            {FEATURES.ONBOARDING && <OnboardingModal />}
         </View>
     );
 }

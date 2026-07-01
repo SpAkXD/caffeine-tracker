@@ -19,8 +19,10 @@ export const FEATURES = FLAGS as {
     SLEEP_FORECAST: boolean;
     SLEEP_QUALITY: boolean;
     HISTORY_CARD: boolean;
+    WEEKLY_SUMMARY: boolean;
     DETAILED_STATS: boolean;
     ADD_DRINK: boolean;
+    ONBOARDING: boolean;
     THEME_TOGGLE: boolean;
     NOTIFICATIONS: boolean;
     WEIGHT_SETTING: boolean;

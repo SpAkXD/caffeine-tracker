@@ -30,6 +30,13 @@ interface CaffeineState {
     bedtimeHour: number; // 0-23, default 22 (10 PM)
     use24HourFormat: boolean; // 12h vs 24h time display
     customPresets: CustomPreset[];
+    hasOnboarded: boolean; // First-launch onboarding completed
+    /**
+     * Per-day intake totals ('yyyy-MM-dd' → total mg).
+     * Kept separately from doses[] so weekly stats & streaks survive
+     * the 3-day dose retention purge. Pruned after 60 days.
+     */
+    dailyIntakeLog: Record<string, number>;
 
     // === SINGLE SOURCE OF TRUTH ===
     // These are computed once and shared across all components.
@@ -53,6 +60,7 @@ interface CaffeineState {
     removeCustomPreset: (id: string) => void;
     updateCustomPreset: (id: string, partial: Partial<Pick<CustomPreset, 'name' | 'mg'>>) => void;
     refreshCurrentLevel: () => void; // Recalculate currentLevel + clearanceTime from Date.now()
+    completeOnboarding: () => void;
 
     // Selectors (still available for backward compat)
     getCurrentLevel: () => number;
@@ -61,7 +69,14 @@ interface CaffeineState {
     getAlertnessData: (hoursLookback?: number, hoursLookahead?: number) => { value: number; date: number }[];
     getWeeklyHistory: () => DailyStats[];
     getTodaysDoses: () => Dose[];
+    /** Consecutive days (ending today) with intake ≤ DAILY_LIMIT_MG. 0 if nothing ever logged. */
+    getStreakDays: () => number;
+    /** Last 7 days of intake totals from dailyIntakeLog (oldest → today). */
+    getWeeklyIntake: () => { date: string; totalMg: number }[];
 }
+
+/** FDA-recommended daily caffeine ceiling for healthy adults. */
+export const DAILY_LIMIT_MG = 400;
 
 /**
  * Calculate effective half-life based on body weight.
@@ -92,6 +107,8 @@ export const useCaffeineStore = create<CaffeineState>()(
             bedtimeHour: 22,
             use24HourFormat: false,
             customPresets: [],
+            hasOnboarded: false,
+            dailyIntakeLog: {},
 
             // === Single Source of Truth state ===
             currentLevel: 0,
@@ -99,11 +116,16 @@ export const useCaffeineStore = create<CaffeineState>()(
             lastRefreshed: 0,
 
             addDose: (mg, timestamp = Date.now()) => {
+                const dayKey = format(new Date(timestamp), 'yyyy-MM-dd');
                 set((state) => ({
                     doses: [
                         ...state.doses,
                         { id: Math.random().toString(36).substr(2, 9), mg, timestamp },
                     ],
+                    dailyIntakeLog: {
+                        ...state.dailyIntakeLog,
+                        [dayKey]: (state.dailyIntakeLog[dayKey] ?? 0) + mg,
+                    },
                 }));
                 // Auto-cleanup and refresh after adding
                 get().cleanupOldDoses();
@@ -119,9 +141,20 @@ export const useCaffeineStore = create<CaffeineState>()(
             },
 
             removeDose: (id) => {
-                set((state) => ({
-                    doses: state.doses.filter((d) => d.id !== id),
-                }));
+                set((state) => {
+                    const dose = state.doses.find((d) => d.id === id);
+                    const next: Partial<CaffeineState> = {
+                        doses: state.doses.filter((d) => d.id !== id),
+                    };
+                    if (dose) {
+                        const dayKey = format(new Date(dose.timestamp), 'yyyy-MM-dd');
+                        next.dailyIntakeLog = {
+                            ...state.dailyIntakeLog,
+                            [dayKey]: Math.max(0, (state.dailyIntakeLog[dayKey] ?? 0) - dose.mg),
+                        };
+                    }
+                    return next;
+                });
                 get().refreshCurrentLevel();
                 refreshWidget().catch(() => { });
             },
@@ -166,7 +199,7 @@ export const useCaffeineStore = create<CaffeineState>()(
             },
 
             clearDoses: () => {
-                set({ doses: [], currentLevel: 0, clearanceTime: null });
+                set({ doses: [], currentLevel: 0, clearanceTime: null, dailyIntakeLog: {} });
                 refreshWidget().catch(() => { });
             },
 
@@ -175,9 +208,18 @@ export const useCaffeineStore = create<CaffeineState>()(
                 const { useProStore } = require('./useProStore');
                 const isPro = useProStore.getState().isPro();
                 const cutoff = Date.now() - (isPro ? PRO_RETENTION_MS : FREE_RETENTION_MS);
-                set((state) => ({
-                    doses: state.doses.filter((d) => d.timestamp >= cutoff),
-                }));
+                const logCutoffKey = format(subDays(new Date(), 60), 'yyyy-MM-dd');
+                set((state) => {
+                    // Prune daily intake log entries older than 60 days
+                    const prunedLog: Record<string, number> = {};
+                    for (const [day, mg] of Object.entries(state.dailyIntakeLog)) {
+                        if (day >= logCutoffKey) prunedLog[day] = mg;
+                    }
+                    return {
+                        doses: state.doses.filter((d) => d.timestamp >= cutoff),
+                        dailyIntakeLog: prunedLog,
+                    };
+                });
             },
 
             addCustomPreset: (name, mg) => {
@@ -201,6 +243,10 @@ export const useCaffeineStore = create<CaffeineState>()(
                         p.id === id ? { ...p, ...partial } : p
                     ),
                 }));
+            },
+
+            completeOnboarding: () => {
+                set({ hasOnboarded: true });
             },
 
             // === REFRESH: Single calculation point ===
@@ -293,6 +339,38 @@ export const useCaffeineStore = create<CaffeineState>()(
                 const { doses } = get();
                 const todayStart = startOfDay(new Date()).getTime();
                 return doses.filter(d => d.timestamp >= todayStart).sort((a, b) => b.timestamp - a.timestamp);
+            },
+
+            getStreakDays: () => {
+                const { dailyIntakeLog } = get();
+                const loggedDays = Object.keys(dailyIntakeLog);
+                if (loggedDays.length === 0) return 0;
+
+                // Walk backwards from today; a day counts if intake ≤ limit
+                // (days with no entry count as 0 mg). Stop at the earliest
+                // logged day so a fresh install doesn't get an infinite streak.
+                const earliest = loggedDays.sort()[0];
+                let streak = 0;
+                for (let i = 0; i < 60; i++) {
+                    const dayKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
+                    if (dayKey < earliest) break;
+                    if ((dailyIntakeLog[dayKey] ?? 0) <= DAILY_LIMIT_MG) {
+                        streak++;
+                    } else {
+                        break;
+                    }
+                }
+                return streak;
+            },
+
+            getWeeklyIntake: () => {
+                const { dailyIntakeLog } = get();
+                const days: { date: string; totalMg: number }[] = [];
+                for (let i = 6; i >= 0; i--) {
+                    const dayKey = format(subDays(new Date(), i), 'yyyy-MM-dd');
+                    days.push({ date: dayKey, totalMg: dailyIntakeLog[dayKey] ?? 0 });
+                }
+                return days;
             },
         }),
         {
